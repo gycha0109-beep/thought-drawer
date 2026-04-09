@@ -17,6 +17,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.material3.CenterAlignedTopAppBar
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FilterChip
+import androidx.compose.material3.TextButton
 import androidx.compose.material3.NavigationBar
 import androidx.compose.material3.NavigationBarItem
 import androidx.compose.material3.Scaffold
@@ -101,8 +102,9 @@ fun BrainCleanApp(thoughtViewModel: ThoughtViewModel) {
     val snackbarHostState = remember { SnackbarHostState() }
     val coroutineScope = rememberCoroutineScope()
     val currentTab = uiState.selectedTab
+    var selectedThoughtIds by remember(currentTab) { mutableStateOf(emptySet<Long>()) }
     val searchQuery = uiState.searchQueries[currentTab].orEmpty()
-    val sortRecentFirst = uiState.sortRecentFirst
+    val sortOption = uiState.sortOption
     val notificationPermissionLauncher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.RequestPermission()
     ) { }
@@ -126,10 +128,16 @@ fun BrainCleanApp(thoughtViewModel: ThoughtViewModel) {
             }
         }
 
-        return if (sortRecentFirst) {
-            filteredThoughts.sortedByDescending { it.id }
-        } else {
-            filteredThoughts.sortedBy { it.id }
+        return when (sortOption) {
+            ThoughtSortOption.RECENT -> filteredThoughts.sortedByDescending { it.id }
+            ThoughtSortOption.OLDEST -> filteredThoughts.sortedBy { it.id }
+            ThoughtSortOption.REMINDER -> filteredThoughts.sortedWith(
+                compareBy<Thought>(
+                    { it.remindAt == null },
+                    { it.remindAt ?: Long.MAX_VALUE },
+                    { -it.id }
+                )
+            )
         }
     }
 
@@ -172,6 +180,27 @@ fun BrainCleanApp(thoughtViewModel: ThoughtViewModel) {
         showUndoSnackbar("Thought deleted", thought)
     }
 
+    fun toggleSelection(thoughtId: Long) {
+        selectedThoughtIds = if (thoughtId in selectedThoughtIds) {
+            selectedThoughtIds - thoughtId
+        } else {
+            selectedThoughtIds + thoughtId
+        }
+    }
+
+    fun startSelection(thoughtId: Long) {
+        selectedThoughtIds = selectedThoughtIds + thoughtId
+    }
+
+    fun clearSelection() {
+        selectedThoughtIds = emptySet()
+    }
+
+    fun deleteSelectedThoughts() {
+        thoughtViewModel.deleteThoughts(selectedThoughtIds)
+        clearSelection()
+    }
+
     Scaffold(
         modifier = Modifier.fillMaxSize(),
         topBar = {
@@ -179,13 +208,27 @@ fun BrainCleanApp(thoughtViewModel: ThoughtViewModel) {
                 CenterAlignedTopAppBar(
                     title = {
                         Text(
-                            when (currentTab) {
-                                ThoughtTab.INBOX -> "Inbox"
-                                ThoughtTab.TODAY -> "Today"
-                                ThoughtTab.LATER -> "Later"
-                                ThoughtTab.DONE -> "Done"
+                            if (selectedThoughtIds.isNotEmpty()) {
+                                "${selectedThoughtIds.size} selected"
+                            } else {
+                                when (currentTab) {
+                                    ThoughtTab.INBOX -> "Inbox"
+                                    ThoughtTab.TODAY -> "Today"
+                                    ThoughtTab.LATER -> "Later"
+                                    ThoughtTab.DONE -> "Done"
+                                }
                             }
                         )
+                    },
+                    actions = {
+                        if (selectedThoughtIds.isNotEmpty()) {
+                            TextButton(onClick = ::deleteSelectedThoughts) {
+                                Text("Delete")
+                            }
+                            TextButton(onClick = ::clearSelection) {
+                                Text("Cancel")
+                            }
+                        }
                     }
                 )
 
@@ -211,24 +254,32 @@ fun BrainCleanApp(thoughtViewModel: ThoughtViewModel) {
                     onExpandedChange = { isSearchExpanded = it }
                 ) {}
 
-                androidx.compose.foundation.layout.Row(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(horizontal = 16.dp, vertical = 8.dp),
-                    horizontalArrangement = Arrangement.spacedBy(8.dp)
-                ) {
-                    FilterChip(
-                        selected = sortRecentFirst,
-                        onClick = { thoughtViewModel.setSortRecentFirst(true) },
-                        modifier = Modifier.testTag("sort_recent"),
-                        label = { Text("Recent") }
-                    )
-                    FilterChip(
-                        selected = !sortRecentFirst,
-                        onClick = { thoughtViewModel.setSortRecentFirst(false) },
-                        modifier = Modifier.testTag("sort_oldest"),
-                        label = { Text("Oldest") }
-                    )
+                if (selectedThoughtIds.isEmpty()) {
+                    androidx.compose.foundation.layout.Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(horizontal = 16.dp, vertical = 8.dp),
+                        horizontalArrangement = Arrangement.spacedBy(8.dp)
+                    ) {
+                        FilterChip(
+                            selected = sortOption == ThoughtSortOption.RECENT,
+                            onClick = { thoughtViewModel.setSortOption(ThoughtSortOption.RECENT) },
+                            modifier = Modifier.testTag("sort_recent"),
+                            label = { Text("Recent") }
+                        )
+                        FilterChip(
+                            selected = sortOption == ThoughtSortOption.OLDEST,
+                            onClick = { thoughtViewModel.setSortOption(ThoughtSortOption.OLDEST) },
+                            modifier = Modifier.testTag("sort_oldest"),
+                            label = { Text("Oldest") }
+                        )
+                        FilterChip(
+                            selected = sortOption == ThoughtSortOption.REMINDER,
+                            onClick = { thoughtViewModel.setSortOption(ThoughtSortOption.REMINDER) },
+                            modifier = Modifier.testTag("sort_reminder"),
+                            label = { Text("Reminder") }
+                        )
+                    }
                 }
             }
         },
@@ -276,7 +327,10 @@ fun BrainCleanApp(thoughtViewModel: ThoughtViewModel) {
             when (currentTab) {
                 ThoughtTab.INBOX -> InboxScreen(
                     thoughts = inboxThoughts,
+                    selectedThoughtIds = selectedThoughtIds,
                     onAddThought = thoughtViewModel::addThought,
+                    onToggleSelection = ::toggleSelection,
+                    onStartSelection = ::startSelection,
                     onMoveToToday = { thoughtViewModel.updateThoughtStatus(it, ThoughtStatus.TODAY) },
                     onMoveToLater = { thoughtViewModel.updateThoughtStatus(it, ThoughtStatus.LATER) },
                     onMarkDone = ::handleDone,
@@ -288,6 +342,9 @@ fun BrainCleanApp(thoughtViewModel: ThoughtViewModel) {
 
                 ThoughtTab.TODAY -> TodayScreen(
                     thoughts = todayThoughts,
+                    selectedThoughtIds = selectedThoughtIds,
+                    onToggleSelection = ::toggleSelection,
+                    onStartSelection = ::startSelection,
                     onMoveToInbox = { thoughtViewModel.updateThoughtStatus(it, ThoughtStatus.INBOX) },
                     onMoveToLater = { thoughtViewModel.updateThoughtStatus(it, ThoughtStatus.LATER) },
                     onMarkDone = ::handleDone,
@@ -299,6 +356,9 @@ fun BrainCleanApp(thoughtViewModel: ThoughtViewModel) {
 
                 ThoughtTab.LATER -> LaterScreen(
                     thoughts = laterThoughts,
+                    selectedThoughtIds = selectedThoughtIds,
+                    onToggleSelection = ::toggleSelection,
+                    onStartSelection = ::startSelection,
                     onMoveToInbox = { thoughtViewModel.updateThoughtStatus(it, ThoughtStatus.INBOX) },
                     onMoveToToday = { thoughtViewModel.updateThoughtStatus(it, ThoughtStatus.TODAY) },
                     onMarkDone = ::handleDone,
@@ -310,6 +370,9 @@ fun BrainCleanApp(thoughtViewModel: ThoughtViewModel) {
 
                 ThoughtTab.DONE -> DoneScreen(
                     thoughts = doneThoughts,
+                    selectedThoughtIds = selectedThoughtIds,
+                    onToggleSelection = ::toggleSelection,
+                    onStartSelection = ::startSelection,
                     onMoveToInbox = { thoughtViewModel.updateThoughtStatus(it, ThoughtStatus.INBOX) },
                     onDeleteThought = ::handleDelete,
                     onEditThought = thoughtViewModel::updateThoughtContent

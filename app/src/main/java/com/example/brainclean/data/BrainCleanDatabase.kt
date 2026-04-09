@@ -9,7 +9,7 @@ import androidx.sqlite.db.SupportSQLiteDatabase
 
 @Database(
     entities = [ThoughtEntity::class],
-    version = 2,
+    version = 4,
     exportSchema = false
 )
 abstract class BrainCleanDatabase : RoomDatabase() {
@@ -27,6 +27,8 @@ abstract class BrainCleanDatabase : RoomDatabase() {
                     "brain_clean_database"
                 )
                     .addMigrations(MIGRATION_1_2)
+                    .addMigrations(MIGRATION_2_3)
+                    .addMigrations(MIGRATION_3_4)
                     .build()
                     .also { database ->
                     INSTANCE = database
@@ -37,6 +39,36 @@ abstract class BrainCleanDatabase : RoomDatabase() {
         private val MIGRATION_1_2 = object : Migration(1, 2) {
             override fun migrate(database: SupportSQLiteDatabase) {
                 database.execSQL("ALTER TABLE thoughts ADD COLUMN remindAt INTEGER")
+            }
+        }
+
+        private val MIGRATION_2_3 = object : Migration(2, 3) {
+            override fun migrate(database: SupportSQLiteDatabase) {
+                database.execSQL("ALTER TABLE thoughts ADD COLUMN createdAt INTEGER NOT NULL DEFAULT 0")
+                database.execSQL("ALTER TABLE thoughts ADD COLUMN completedAt INTEGER")
+                database.execSQL(
+                    """
+                    UPDATE thoughts
+                    SET createdAt = id,
+                        completedAt = CASE WHEN status = 'DONE' THEN id ELSE NULL END
+                    """.trimIndent()
+                )
+            }
+        }
+
+        private val MIGRATION_3_4 = object : Migration(3, 4) {
+            override fun migrate(database: SupportSQLiteDatabase) {
+                database.execSQL("ALTER TABLE thoughts ADD COLUMN inboxEnteredAt INTEGER NOT NULL DEFAULT 0")
+                database.execSQL("ALTER TABLE thoughts ADD COLUMN staleInboxReminderSentAt INTEGER")
+                database.execSQL(
+                    """
+                    UPDATE thoughts
+                    SET inboxEnteredAt = CASE
+                        WHEN status = 'INBOX' THEN createdAt
+                        ELSE 0
+                    END
+                    """.trimIndent()
+                )
             }
         }
     }

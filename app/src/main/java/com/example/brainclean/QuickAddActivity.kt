@@ -1,6 +1,7 @@
 package com.example.brainclean
 
 import android.os.Bundle
+import android.view.WindowManager
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.compose.foundation.layout.Arrangement
@@ -13,11 +14,15 @@ import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.focus.FocusRequester
+import androidx.compose.ui.focus.focusRequester
+import androidx.compose.ui.platform.LocalSoftwareKeyboardController
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.lifecycleScope
@@ -32,6 +37,7 @@ import kotlinx.coroutines.launch
 class QuickAddActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        window.setSoftInputMode(WindowManager.LayoutParams.SOFT_INPUT_STATE_ALWAYS_VISIBLE)
 
         setContent {
             BrainCleanTheme {
@@ -51,10 +57,13 @@ class QuickAddActivity : ComponentActivity() {
         if (trimmedContent.isBlank()) return
 
         lifecycleScope.launch {
+            val createdAt = System.currentTimeMillis()
             val thought = Thought(
-                id = System.currentTimeMillis(),
+                id = createdAt,
                 content = trimmedContent,
-                status = ThoughtStatus.INBOX
+                status = ThoughtStatus.INBOX,
+                createdAt = createdAt,
+                inboxEnteredAt = createdAt
             )
 
             BrainCleanDatabase.getDatabase(applicationContext)
@@ -70,6 +79,13 @@ class QuickAddActivity : ComponentActivity() {
 @Composable
 private fun QuickAddScreen(onSave: (String) -> Unit) {
     var inputText by remember { mutableStateOf("") }
+    val focusRequester = remember { FocusRequester() }
+    val keyboardController = LocalSoftwareKeyboardController.current
+
+    LaunchedEffect(Unit) {
+        focusRequester.requestFocus()
+        keyboardController?.show()
+    }
 
     Column(
         modifier = Modifier
@@ -80,7 +96,9 @@ private fun QuickAddScreen(onSave: (String) -> Unit) {
         OutlinedTextField(
             value = inputText,
             onValueChange = { inputText = it },
-            modifier = Modifier.fillMaxWidth(),
+            modifier = Modifier
+                .fillMaxWidth()
+                .focusRequester(focusRequester),
             label = { Text(stringResource(R.string.quick_add_hint)) }
         )
 

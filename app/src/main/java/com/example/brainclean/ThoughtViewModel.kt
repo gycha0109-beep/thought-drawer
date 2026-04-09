@@ -26,6 +26,12 @@ enum class ThoughtTab {
     DONE
 }
 
+enum class ThoughtSortOption {
+    RECENT,
+    OLDEST,
+    REMINDER
+}
+
 private fun defaultSearchQueries(): Map<ThoughtTab, String> {
     return ThoughtTab.entries.associateWith { "" }
 }
@@ -34,7 +40,7 @@ data class ThoughtUiState(
     val thoughts: List<Thought> = emptyList(),
     val selectedTab: ThoughtTab = ThoughtTab.INBOX,
     val searchQueries: Map<ThoughtTab, String> = defaultSearchQueries(),
-    val sortRecentFirst: Boolean = true
+    val sortOption: ThoughtSortOption = ThoughtSortOption.RECENT
 )
 
 sealed interface ThoughtUiEvent {
@@ -52,7 +58,7 @@ class ThoughtViewModel(
         ThoughtUiState(
             selectedTab = restoreSelectedTab(),
             searchQueries = restoreSearchQueries(),
-            sortRecentFirst = savedStateHandle[SORT_RECENT_FIRST_KEY] ?: true
+            sortOption = restoreSortOption()
         )
     )
     val uiState: StateFlow<ThoughtUiState> = _uiState.asStateFlow()
@@ -60,10 +66,25 @@ class ThoughtViewModel(
     val events: SharedFlow<ThoughtUiEvent> = _events.asSharedFlow()
 
     private var hasSeededDatabase = false
+    private val seedBaseTime = System.currentTimeMillis()
 
     private val defaultThoughts = listOf(
-        Thought(1, "Write down the idea for tomorrow's workout", ThoughtStatus.INBOX, null),
-        Thought(2, "Break the project into the first small step", ThoughtStatus.INBOX, null)
+        Thought(
+            id = seedBaseTime - 2_000L,
+            content = "Write down the idea for tomorrow's workout",
+            status = ThoughtStatus.INBOX,
+            remindAt = null,
+            createdAt = seedBaseTime - 2_000L,
+            inboxEnteredAt = seedBaseTime - 2_000L
+        ),
+        Thought(
+            id = seedBaseTime - 1_000L,
+            content = "Break the project into the first small step",
+            status = ThoughtStatus.INBOX,
+            remindAt = null,
+            createdAt = seedBaseTime - 1_000L,
+            inboxEnteredAt = seedBaseTime - 1_000L
+        )
     )
 
     init {
@@ -75,11 +96,14 @@ class ThoughtViewModel(
         if (trimmedContent.isBlank()) return
 
         viewModelScope.launch {
+            val createdAt = System.currentTimeMillis()
             val newThought = Thought(
-                id = System.currentTimeMillis(),
+                id = createdAt,
                 content = trimmedContent,
                 status = ThoughtStatus.INBOX,
-                remindAt = null
+                remindAt = null,
+                createdAt = createdAt,
+                inboxEnteredAt = createdAt
             )
 
             thoughtDao.insertThought(ThoughtEntity.fromThought(newThought))
@@ -91,10 +115,25 @@ class ThoughtViewModel(
         val existingThought = uiState.value.thoughts.firstOrNull { it.id == id } ?: return
 
         viewModelScope.launch {
+            val now = System.currentTimeMillis()
             val updatedThought = if (status == ThoughtStatus.DONE) {
-                existingThought.copy(status = status, remindAt = null)
+                existingThought.copy(
+                    status = status,
+                    remindAt = null,
+                    completedAt = now
+                )
+            } else if (status == ThoughtStatus.INBOX && existingThought.status != ThoughtStatus.INBOX) {
+                existingThought.copy(
+                    status = status,
+                    completedAt = null,
+                    inboxEnteredAt = now,
+                    staleInboxReminderSentAt = null
+                )
             } else {
-                existingThought.copy(status = status)
+                existingThought.copy(
+                    status = status,
+                    completedAt = null
+                )
             }
             thoughtDao.updateThought(
                 ThoughtEntity.fromThought(updatedThought)
@@ -111,7 +150,19 @@ class ThoughtViewModel(
         val existingThought = uiState.value.thoughts.firstOrNull { it.id == id } ?: return
 
         viewModelScope.launch {
-            val updatedThought = existingThought.copy(content = trimmedContent)
+            val updatedThought = existingThought.copy(
+                content = trimmedContent,
+                inboxEnteredAt = if (existingThought.status == ThoughtStatus.INBOX) {
+                    System.currentTimeMillis()
+                } else {
+                    existingThought.inboxEnteredAt
+                },
+                staleInboxReminderSentAt = if (existingThought.status == ThoughtStatus.INBOX) {
+                    null
+                } else {
+                    existingThought.staleInboxReminderSentAt
+                }
+            )
             thoughtDao.updateThought(ThoughtEntity.fromThought(updatedThought))
             syncReminder(updatedThought)
             BrainCleanHomeWidget.refreshAll(getApplication())
@@ -138,6 +189,23 @@ class ThoughtViewModel(
         viewModelScope.launch {
             thoughtDao.deleteThought(ThoughtEntity.fromThought(existingThought))
             reminderScheduler.cancelReminder(existingThought.id)
+            reminderScheduler.cancelStaleInboxReminder(existingThought.id)
+            BrainCleanHomeWidget.refreshAll(getApplication())
+        }
+    }
+
+    fun deleteThoughts(ids: Set<Long>) {
+        if (ids.isEmpty()) return
+
+        val thoughtsToDelete = uiState.value.thoughts.filter { it.id in ids }
+        if (thoughtsToDelete.isEmpty()) return
+
+        viewModelScope.launch {
+            thoughtsToDelete.forEach { thought ->
+                thoughtDao.deleteThought(ThoughtEntity.fromThought(thought))
+                reminderScheduler.cancelReminder(thought.id)
+                reminderScheduler.cancelStaleInboxReminder(thought.id)
+            }
             BrainCleanHomeWidget.refreshAll(getApplication())
         }
     }
@@ -170,9 +238,9 @@ class ThoughtViewModel(
         )
     }
 
-    fun setSortRecentFirst(sortRecentFirst: Boolean) {
-        savedStateHandle[SORT_RECENT_FIRST_KEY] = sortRecentFirst
-        _uiState.value = _uiState.value.copy(sortRecentFirst = sortRecentFirst)
+    fun setSortOption(sortOption: ThoughtSortOption) {
+        savedStateHandle[SORT_OPTION_KEY] = sortOption.name
+        _uiState.value = _uiState.value.copy(sortOption = sortOption)
     }
 
     private fun observeThoughts() {
@@ -204,6 +272,21 @@ class ThoughtViewModel(
         }
     }
 
+    private fun restoreSortOption(): ThoughtSortOption {
+        val savedSortOption = savedStateHandle.get<String>(SORT_OPTION_KEY)
+        if (savedSortOption != null) {
+            return ThoughtSortOption.entries.firstOrNull { it.name == savedSortOption }
+                ?: ThoughtSortOption.RECENT
+        }
+
+        val legacySortRecentFirst = savedStateHandle.get<Boolean>(SORT_RECENT_FIRST_KEY)
+        return if (legacySortRecentFirst == false) {
+            ThoughtSortOption.OLDEST
+        } else {
+            ThoughtSortOption.RECENT
+        }
+    }
+
     private fun searchQueryKey(tab: ThoughtTab): String {
         return "search_query_${tab.name.lowercase()}"
     }
@@ -226,6 +309,7 @@ class ThoughtViewModel(
 
     private companion object {
         const val SELECTED_TAB_KEY = "selected_tab"
+        const val SORT_OPTION_KEY = "sort_option"
         const val SORT_RECENT_FIRST_KEY = "sort_recent_first"
     }
 }

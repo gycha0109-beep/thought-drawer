@@ -17,15 +17,21 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalFocusManager
+import androidx.compose.ui.platform.LocalSoftwareKeyboardController
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.unit.dp
 import com.example.brainclean.model.Thought
 import com.example.brainclean.ui.component.ThoughtItem
+import com.example.brainclean.ui.component.formatThoughtTimestamp
 
 @Composable
 fun InboxScreen(
     thoughts: List<Thought>,
+    selectedThoughtIds: Set<Long>,
     onAddThought: (String) -> Unit,
+    onToggleSelection: (Long) -> Unit,
+    onStartSelection: (Long) -> Unit,
     onMoveToToday: (Long) -> Unit,
     onMoveToLater: (Long) -> Unit,
     onMarkDone: (Thought) -> Unit,
@@ -35,6 +41,8 @@ fun InboxScreen(
     onClearReminder: (Long) -> Unit
 ) {
     var inputText by remember { mutableStateOf("") }
+    val focusManager = LocalFocusManager.current
+    val keyboardController = LocalSoftwareKeyboardController.current
 
     Column(
         modifier = Modifier
@@ -55,6 +63,8 @@ fun InboxScreen(
                 if (inputText.isNotBlank()) {
                     onAddThought(inputText.trim())
                     inputText = ""
+                    focusManager.clearFocus(force = true)
+                    keyboardController?.hide()
                 }
             },
             modifier = Modifier
@@ -75,6 +85,11 @@ fun InboxScreen(
             items(thoughts, key = { it.id }) { thought ->
                 ThoughtItem(
                     thought = thought,
+                    metadataText = formatThoughtTimestamp("Created", thought.createdAt),
+                    isSelectionMode = selectedThoughtIds.isNotEmpty(),
+                    isSelected = thought.id in selectedThoughtIds,
+                    onToggleSelection = { onToggleSelection(thought.id) },
+                    onStartSelection = { onStartSelection(thought.id) },
                     firstButtonText = "Today",
                     secondButtonText = "Later",
                     onFirstClick = { onMoveToToday(thought.id) },

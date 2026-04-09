@@ -22,34 +22,70 @@ import kotlinx.coroutines.launch
 
 class ThoughtReminderReceiver : BroadcastReceiver() {
     override fun onReceive(context: Context, intent: Intent) {
-        if (intent.action != ACTION_SHOW_REMINDER) return
+        if (intent.action != ACTION_SHOW_REMINDER && intent.action != ACTION_SHOW_STALE_INBOX_REMINDER) {
+            return
+        }
 
         val pendingResult = goAsync()
         CoroutineScope(Dispatchers.IO).launch {
             try {
                 val thoughtId = intent.getLongExtra(EXTRA_THOUGHT_ID, -1L)
                 val remindAt = intent.getLongExtra(EXTRA_REMIND_AT, -1L)
+                val inboxEnteredAt = intent.getLongExtra(EXTRA_INBOX_ENTERED_AT, -1L)
                 if (thoughtId == -1L || remindAt == -1L) return@launch
 
                 val thoughtDao = BrainCleanDatabase.getDatabase(context).thoughtDao()
                 val currentThought = thoughtDao.getThoughtById(thoughtId)?.toThought() ?: return@launch
 
-                if (currentThought.status == ThoughtStatus.DONE || currentThought.remindAt != remindAt) {
-                    return@launch
+                when (intent.action) {
+                    ACTION_SHOW_REMINDER -> {
+                        if (currentThought.status == ThoughtStatus.DONE || currentThought.remindAt != remindAt) {
+                            return@launch
+                        }
+
+                        thoughtDao.insertThought(
+                            ThoughtEntity.fromThought(currentThought.copy(remindAt = null))
+                        )
+
+                        showNotification(context, thoughtId, "Thought reminder", currentThought.content)
+                    }
+
+                    ACTION_SHOW_STALE_INBOX_REMINDER -> {
+                        if (
+                            inboxEnteredAt == -1L ||
+                            currentThought.status != ThoughtStatus.INBOX ||
+                            currentThought.inboxEnteredAt != inboxEnteredAt ||
+                            currentThought.staleInboxReminderSentAt != null
+                        ) {
+                            return@launch
+                        }
+
+                        thoughtDao.insertThought(
+                            ThoughtEntity.fromThought(
+                                currentThought.copy(staleInboxReminderSentAt = System.currentTimeMillis())
+                            )
+                        )
+
+                        showNotification(
+                            context,
+                            thoughtId + STALE_NOTIFICATION_ID_OFFSET,
+                            "Inbox thought still waiting",
+                            currentThought.content
+                        )
+                    }
                 }
-
-                thoughtDao.insertThought(
-                    ThoughtEntity.fromThought(currentThought.copy(remindAt = null))
-                )
-
-                showNotification(context, thoughtId, currentThought.content)
             } finally {
                 pendingResult.finish()
             }
         }
     }
 
-    private fun showNotification(context: Context, thoughtId: Long, thoughtContent: String) {
+    private fun showNotification(
+        context: Context,
+        notificationId: Long,
+        title: String,
+        thoughtContent: String
+    ) {
         createNotificationChannel(context)
 
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU &&
@@ -63,14 +99,14 @@ class ThoughtReminderReceiver : BroadcastReceiver() {
 
         val contentIntent = PendingIntent.getActivity(
             context,
-            thoughtId.toInt(),
+            notificationId.toInt(),
             Intent(context, MainActivity::class.java),
             PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
         )
 
         val notification = NotificationCompat.Builder(context, CHANNEL_ID)
             .setSmallIcon(android.R.drawable.ic_popup_reminder)
-            .setContentTitle("Thought reminder")
+            .setContentTitle(title)
             .setContentText(thoughtContent)
             .setStyle(NotificationCompat.BigTextStyle().bigText(thoughtContent))
             .setContentIntent(contentIntent)
@@ -78,15 +114,18 @@ class ThoughtReminderReceiver : BroadcastReceiver() {
             .setPriority(NotificationCompat.PRIORITY_HIGH)
             .build()
 
-        NotificationManagerCompat.from(context).notify(thoughtId.toInt(), notification)
+        NotificationManagerCompat.from(context).notify(notificationId.toInt(), notification)
     }
 
     companion object {
         const val ACTION_SHOW_REMINDER = "com.example.brainclean.action.SHOW_REMINDER"
+        const val ACTION_SHOW_STALE_INBOX_REMINDER = "com.example.brainclean.action.SHOW_STALE_INBOX_REMINDER"
         const val EXTRA_THOUGHT_ID = "extra_thought_id"
         const val EXTRA_REMIND_AT = "extra_remind_at"
+        const val EXTRA_INBOX_ENTERED_AT = "extra_inbox_entered_at"
 
         private const val CHANNEL_ID = "thought_reminders"
+        private const val STALE_NOTIFICATION_ID_OFFSET = 1_000_000L
 
         fun createNotificationChannel(context: Context) {
             if (Build.VERSION.SDK_INT < Build.VERSION_CODES.O) return

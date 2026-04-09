@@ -14,10 +14,14 @@ import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.unit.dp
 import com.example.brainclean.model.Thought
 import com.example.brainclean.ui.component.ThoughtItem
+import com.example.brainclean.ui.component.formatThoughtTimestamp
 
 @Composable
 fun DoneScreen(
     thoughts: List<Thought>,
+    selectedThoughtIds: Set<Long>,
+    onToggleSelection: (Long) -> Unit,
+    onStartSelection: (Long) -> Unit,
     onMoveToInbox: (Long) -> Unit,
     onDeleteThought: (Thought) -> Unit,
     onEditThought: (Long, String) -> Unit
@@ -40,6 +44,11 @@ fun DoneScreen(
             items(thoughts, key = { it.id }) { thought ->
                 ThoughtItem(
                     thought = thought,
+                    metadataText = formatThoughtTimestamp("Completed", thought.completedAt),
+                    isSelectionMode = selectedThoughtIds.isNotEmpty(),
+                    isSelected = thought.id in selectedThoughtIds,
+                    onToggleSelection = { onToggleSelection(thought.id) },
+                    onStartSelection = { onStartSelection(thought.id) },
                     firstButtonText = "Inbox",
                     onFirstClick = { onMoveToInbox(thought.id) },
                     onDoneClick = {},

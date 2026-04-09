@@ -10,14 +10,22 @@ data class ThoughtEntity(
     @PrimaryKey val id: Long,
     val content: String,
     val status: String,
-    val remindAt: Long? = null
+    val remindAt: Long? = null,
+    val createdAt: Long,
+    val completedAt: Long? = null,
+    val inboxEnteredAt: Long,
+    val staleInboxReminderSentAt: Long? = null
 ) {
     fun toThought(): Thought {
         return Thought(
             id = id,
             content = content,
             status = ThoughtStatus.valueOf(status),
-            remindAt = remindAt
+            remindAt = remindAt,
+            createdAt = createdAt,
+            completedAt = completedAt,
+            inboxEnteredAt = inboxEnteredAt,
+            staleInboxReminderSentAt = staleInboxReminderSentAt
         )
     }
 
@@ -27,7 +35,11 @@ data class ThoughtEntity(
                 id = thought.id,
                 content = thought.content,
                 status = thought.status.name,
-                remindAt = thought.remindAt
+                remindAt = thought.remindAt,
+                createdAt = thought.createdAt,
+                completedAt = thought.completedAt,
+                inboxEnteredAt = thought.inboxEnteredAt,
+                staleInboxReminderSentAt = thought.staleInboxReminderSentAt
             )
         }
     }

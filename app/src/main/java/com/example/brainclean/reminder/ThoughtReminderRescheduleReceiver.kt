@@ -18,7 +18,7 @@ class ThoughtReminderRescheduleReceiver : BroadcastReceiver() {
             try {
                 val thoughtDao = BrainCleanDatabase.getDatabase(context).thoughtDao()
                 val scheduler = ThoughtReminderScheduler(context)
-                thoughtDao.getThoughtsWithReminders(ThoughtStatus.DONE.name).forEach { thoughtEntity ->
+                thoughtDao.getAllThoughts().forEach { thoughtEntity ->
                     scheduler.syncReminder(thoughtEntity.toThought())
                 }
             } finally {

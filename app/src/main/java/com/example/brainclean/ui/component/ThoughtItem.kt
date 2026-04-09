@@ -4,6 +4,11 @@ import android.app.DatePickerDialog
 import android.app.TimePickerDialog
 import android.widget.Toast
 import androidx.compose.foundation.background
+import androidx.compose.foundation.combinedClickable
+import androidx.compose.foundation.border
+import androidx.compose.foundation.ExperimentalFoundationApi
+import androidx.compose.foundation.layout.ExperimentalLayoutApi
+import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -13,7 +18,9 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material3.Button
 import androidx.compose.material3.Card
+import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.SwipeToDismissBox
@@ -39,10 +46,15 @@ import com.example.brainclean.model.Thought
 import java.text.DateFormat
 import java.util.Calendar
 
-@OptIn(ExperimentalMaterial3Api::class)
+@OptIn(ExperimentalMaterial3Api::class, ExperimentalLayoutApi::class, ExperimentalFoundationApi::class)
 @Composable
 fun ThoughtItem(
     thought: Thought,
+    metadataText: String? = null,
+    isSelectionMode: Boolean = false,
+    isSelected: Boolean = false,
+    onToggleSelection: (() -> Unit)? = null,
+    onStartSelection: (() -> Unit)? = null,
     firstButtonText: String,
     secondButtonText: String? = null,
     onFirstClick: () -> Unit,
@@ -58,6 +70,7 @@ fun ThoughtItem(
     val context = LocalContext.current
     var isEditing by remember(thought.id) { mutableStateOf(false) }
     var editedText by remember(thought.id, thought.content) { mutableStateOf(thought.content) }
+    var isReminderDetailsVisible by remember(thought.id, thought.remindAt) { mutableStateOf(false) }
     val reminderFormatter = remember {
         DateFormat.getDateTimeInstance(DateFormat.MEDIUM, DateFormat.SHORT)
     }
@@ -134,21 +147,45 @@ fun ThoughtItem(
         }
     }
 
+    val cardModifier = Modifier
+        .fillMaxWidth()
+        .combinedClickable(
+            onClick = {
+                if (isSelectionMode) {
+                    onToggleSelection?.invoke()
+                }
+            },
+            onLongClick = {
+                if (!isSelectionMode) {
+                    onStartSelection?.invoke()
+                }
+            }
+        )
+        .semantics {
+            customActions = accessibilityActions
+        }
+        .padding(vertical = 4.dp)
+
+    val cardColors = CardDefaults.cardColors(
+        containerColor = if (isSelected) Color(0xFFF3F4F6) else Color.White
+    )
+
     val dismissState = rememberSwipeToDismissBoxState(
+        positionalThreshold = { totalDistance -> totalDistance * 0.6f },
         confirmValueChange = { dismissValue ->
             when (dismissValue) {
                 SwipeToDismissBoxValue.StartToEnd -> {
-                    if (!isEditing && enableDoneSwipe) {
+                    if (!isEditing && !isSelectionMode && enableDoneSwipe) {
                         onDoneClick()
                     }
-                    !isEditing && enableDoneSwipe
+                    !isEditing && !isSelectionMode && enableDoneSwipe
                 }
 
                 SwipeToDismissBoxValue.EndToStart -> {
-                    if (!isEditing) {
+                    if (!isEditing && !isSelectionMode) {
                         onDeleteClick()
                     }
-                    true
+                    !isEditing && !isSelectionMode
                 }
 
                 SwipeToDismissBoxValue.Settled -> true
@@ -158,8 +195,8 @@ fun ThoughtItem(
 
     SwipeToDismissBox(
         state = dismissState,
-        enableDismissFromStartToEnd = !isEditing && enableDoneSwipe,
-        enableDismissFromEndToStart = !isEditing,
+        enableDismissFromStartToEnd = !isEditing && !isSelectionMode && enableDoneSwipe,
+        enableDismissFromEndToStart = !isEditing && !isSelectionMode,
         backgroundContent = {
             ThoughtItemSwipeBackground(
                 dismissState = dismissState,
@@ -169,14 +206,16 @@ fun ThoughtItem(
         },
         content = {
             Card(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .semantics {
-                        customActions = accessibilityActions
+                modifier = cardModifier.then(
+                    if (isSelected) {
+                        Modifier.border(1.dp, Color(0xFF111827), CardDefaults.shape)
+                    } else {
+                        Modifier
                     }
-                    .padding(vertical = 6.dp)
+                ),
+                colors = cardColors
             ) {
-                Column(modifier = Modifier.padding(16.dp)) {
+                Column(modifier = Modifier.padding(horizontal = 14.dp, vertical = 12.dp)) {
                     if (isEditing) {
                         OutlinedTextField(
                             value = editedText,
@@ -188,8 +227,8 @@ fun ThoughtItem(
                         Row(
                             modifier = Modifier
                                 .fillMaxWidth()
-                                .padding(top = 12.dp),
-                            horizontalArrangement = Arrangement.spacedBy(8.dp)
+                                .padding(top = 10.dp),
+                            horizontalArrangement = Arrangement.spacedBy(6.dp)
                         ) {
                             Button(
                                 onClick = {
@@ -213,64 +252,98 @@ fun ThoughtItem(
                             }
                         }
                     } else {
-                        Text(text = thought.content)
+                        Text(
+                            text = thought.content,
+                            style = MaterialTheme.typography.bodyLarge,
+                            color = Color(0xFF111827)
+                        )
 
-                        if (enableReminder) {
-                            val reminderLabel = thought.remindAt?.let {
-                                "Reminder: ${reminderFormatter.format(it)}"
-                            } ?: "No reminder"
-
+                        metadataText?.let { label ->
                             Text(
-                                text = reminderLabel,
-                                modifier = Modifier.padding(top = 8.dp),
+                                text = label,
+                                modifier = Modifier.padding(top = 6.dp),
+                                style = MaterialTheme.typography.bodySmall,
                                 color = Color(0xFF6B7280)
                             )
                         }
 
-                        Row(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .padding(top = 12.dp),
-                            horizontalArrangement = Arrangement.spacedBy(8.dp)
-                        ) {
-                            Button(onClick = onFirstClick) {
-                                Text(firstButtonText)
+                        if (enableReminder) {
+                            thought.remindAt?.takeIf { isReminderDetailsVisible }?.let {
+                                Text(
+                                    text = "Reminder: ${reminderFormatter.format(it)}",
+                                    modifier = Modifier.padding(top = 4.dp),
+                                    style = MaterialTheme.typography.bodySmall,
+                                    color = Color(0xFF6B7280)
+                                )
                             }
-                            if (secondButtonText != null && onSecondClick != null) {
-                                Button(onClick = onSecondClick) {
-                                    Text(secondButtonText)
+                        }
+
+                        if (!isSelectionMode) {
+                            FlowRow(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .padding(top = 10.dp),
+                                horizontalArrangement = Arrangement.spacedBy(6.dp),
+                                verticalArrangement = Arrangement.spacedBy(6.dp)
+                            ) {
+                                Button(onClick = onFirstClick) {
+                                    Text(firstButtonText)
+                                }
+                                if (secondButtonText != null && onSecondClick != null) {
+                                    Button(onClick = onSecondClick) {
+                                        Text(secondButtonText)
+                                    }
                                 }
                             }
                         }
 
-                        Row(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .padding(top = 8.dp),
-                            horizontalArrangement = Arrangement.spacedBy(8.dp, Alignment.End)
-                        ) {
-                            if (enableReminder) {
-                                TextButton(
-                                    onClick = {
-                                        openReminderPicker(
-                                            context = context,
-                                            initialReminder = thought.remindAt,
-                                            onReminderSelected = onSetReminder
-                                        )
+                        if (!isSelectionMode) {
+                            FlowRow(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .padding(top = 4.dp),
+                                horizontalArrangement = Arrangement.spacedBy(4.dp, Alignment.End),
+                                verticalArrangement = Arrangement.spacedBy(4.dp)
+                            ) {
+                                if (enableReminder) {
+                                    if (thought.remindAt != null) {
+                                        TextButton(
+                                            onClick = {
+                                                isReminderDetailsVisible = !isReminderDetailsVisible
+                                            }
+                                        ) {
+                                            Text(
+                                                if (isReminderDetailsVisible) {
+                                                    "Hide reminder"
+                                                } else {
+                                                    "Show reminder"
+                                                }
+                                            )
+                                        }
                                     }
-                                ) {
-                                    Text(if (thought.remindAt == null) "Remind" else "Change reminder")
+
+                                    TextButton(
+                                        onClick = {
+                                            openReminderPicker(
+                                                context = context,
+                                                initialReminder = thought.remindAt,
+                                                onReminderSelected = onSetReminder
+                                            )
+                                        }
+                                    ) {
+                                        Text(if (thought.remindAt == null) "Remind" else "Change reminder")
+                                    }
+
+                                    if (thought.remindAt != null) {
+                                        TextButton(onClick = onClearReminder) {
+                                            Text("Clear reminder")
+                                        }
+                                    }
                                 }
 
-                                if (thought.remindAt != null) {
-                                    TextButton(onClick = onClearReminder) {
-                                        Text("Clear reminder")
-                                    }
+                                TextButton(onClick = { isEditing = true }) {
+                                    Text("Edit")
                                 }
-                            }
-
-                            TextButton(onClick = { isEditing = true }) {
-                                Text("Edit")
                             }
                         }
                     }
@@ -287,13 +360,20 @@ private fun ThoughtItemSwipeBackground(
     isEditing: Boolean,
     enableDoneSwipe: Boolean
 ) {
+    val actionReady = dismissState.targetValue != SwipeToDismissBoxValue.Settled
     val (backgroundColor, label, alignment) = when {
         isEditing -> Triple(Color(0xFFE5E7EB), "", Alignment.Center)
+        dismissState.dismissDirection == SwipeToDismissBoxValue.StartToEnd && enableDoneSwipe && actionReady ->
+            Triple(Color(0xFF86EFAC), "Release to mark done", Alignment.CenterStart)
+
         dismissState.dismissDirection == SwipeToDismissBoxValue.StartToEnd && enableDoneSwipe ->
-            Triple(Color(0xFFDCFCE7), "Done", Alignment.CenterStart)
+            Triple(Color(0xFFDCFCE7), "Swipe farther to mark done", Alignment.CenterStart)
+
+        dismissState.dismissDirection == SwipeToDismissBoxValue.EndToStart && actionReady ->
+            Triple(Color(0xFFFCA5A5), "Release to delete", Alignment.CenterEnd)
 
         dismissState.dismissDirection == SwipeToDismissBoxValue.EndToStart ->
-            Triple(Color(0xFFFEE2E2), "Delete", Alignment.CenterEnd)
+            Triple(Color(0xFFFEE2E2), "Swipe farther to delete", Alignment.CenterEnd)
 
         enableDoneSwipe -> Triple(Color(0xFFF3F4F6), "Swipe to manage", Alignment.Center)
         else -> Triple(Color(0xFFF3F4F6), "Swipe left to delete", Alignment.Center)
@@ -302,7 +382,7 @@ private fun ThoughtItemSwipeBackground(
     Box(
         modifier = Modifier
             .fillMaxSize()
-            .padding(vertical = 6.dp)
+            .padding(vertical = 4.dp)
             .background(backgroundColor),
         contentAlignment = alignment
     ) {

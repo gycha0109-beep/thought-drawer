@@ -14,10 +14,14 @@ import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.unit.dp
 import com.example.brainclean.model.Thought
 import com.example.brainclean.ui.component.ThoughtItem
+import com.example.brainclean.ui.component.formatThoughtTimestamp
 
 @Composable
 fun TodayScreen(
     thoughts: List<Thought>,
+    selectedThoughtIds: Set<Long>,
+    onToggleSelection: (Long) -> Unit,
+    onStartSelection: (Long) -> Unit,
     onMoveToInbox: (Long) -> Unit,
     onMoveToLater: (Long) -> Unit,
     onMarkDone: (Thought) -> Unit,
@@ -44,6 +48,11 @@ fun TodayScreen(
             items(thoughts, key = { it.id }) { thought ->
                 ThoughtItem(
                     thought = thought,
+                    metadataText = formatThoughtTimestamp("Created", thought.createdAt),
+                    isSelectionMode = selectedThoughtIds.isNotEmpty(),
+                    isSelected = thought.id in selectedThoughtIds,
+                    onToggleSelection = { onToggleSelection(thought.id) },
+                    onStartSelection = { onStartSelection(thought.id) },
                     firstButtonText = "Inbox",
                     secondButtonText = "Later",
                     onFirstClick = { onMoveToInbox(thought.id) },
