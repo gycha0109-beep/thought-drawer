@@ -1,0 +1,10 @@
+<resources>
+    <string name="app_name">생각서랍</string>
+    <string name="widget_name">생각서랍 위젯</string>
+    <string name="widget_title">Inbox</string>
+    <string name="widget_empty_state">No inbox thoughts</string>
+    <string name="widget_quick_add">+ 빠른 추가</string>
+    <string name="quick_add_title">빠른 추가</string>
+    <string name="quick_add_hint">생각을 입력하세요</string>
+    <string name="quick_add_save">저장</string>
+</resources>

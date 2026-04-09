@@ -1,0 +1,320 @@
+package com.example.brainclean
+
+import android.Manifest
+import android.content.Intent
+import android.os.Build
+import android.os.Bundle
+import android.provider.Settings
+import androidx.activity.ComponentActivity
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.compose.setContent
+import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.padding
+import androidx.compose.material3.CenterAlignedTopAppBar
+import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.FilterChip
+import androidx.compose.material3.NavigationBar
+import androidx.compose.material3.NavigationBarItem
+import androidx.compose.material3.Scaffold
+import androidx.compose.material3.SearchBar
+import androidx.compose.material3.SearchBarDefaults
+import androidx.compose.material3.SnackbarDuration
+import androidx.compose.material3.SnackbarHost
+import androidx.compose.material3.SnackbarHostState
+import androidx.compose.material3.SnackbarResult
+import androidx.compose.material3.Surface
+import androidx.compose.material3.Text
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.collectAsState
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.setValue
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.unit.dp
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.ViewModelProvider
+import androidx.lifecycle.lifecycleScope
+import androidx.lifecycle.repeatOnLifecycle
+import com.example.brainclean.model.Thought
+import com.example.brainclean.model.ThoughtStatus
+import com.example.brainclean.reminder.ThoughtReminderReceiver
+import com.example.brainclean.ui.screen.DoneScreen
+import com.example.brainclean.ui.screen.InboxScreen
+import com.example.brainclean.ui.screen.LaterScreen
+import com.example.brainclean.ui.screen.TodayScreen
+import com.example.brainclean.ui.theme.BrainCleanTheme
+import kotlinx.coroutines.launch
+
+class MainActivity : ComponentActivity() {
+    private lateinit var thoughtViewModel: ThoughtViewModel
+
+    override fun onCreate(savedInstanceState: Bundle?) {
+        super.onCreate(savedInstanceState)
+
+        thoughtViewModel = ViewModelProvider(this)[ThoughtViewModel::class.java]
+        ThoughtReminderReceiver.createNotificationChannel(this)
+
+        lifecycleScope.launch {
+            repeatOnLifecycle(Lifecycle.State.STARTED) {
+                thoughtViewModel.events.collect { event ->
+                    when (event) {
+                        ThoughtUiEvent.RequestExactAlarmPermission -> {
+                            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+                                startActivity(Intent(Settings.ACTION_REQUEST_SCHEDULE_EXACT_ALARM))
+                            }
+                        }
+
+                        ThoughtUiEvent.RequestNotificationPermission -> Unit
+                    }
+                }
+            }
+        }
+
+        setContent {
+            BrainCleanTheme {
+                BrainCleanApp(thoughtViewModel)
+            }
+        }
+    }
+
+    override fun onResume() {
+        super.onResume()
+        if (::thoughtViewModel.isInitialized) {
+            thoughtViewModel.syncScheduledReminders()
+        }
+    }
+}
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+fun BrainCleanApp(thoughtViewModel: ThoughtViewModel) {
+    var isSearchExpanded by remember { mutableStateOf(false) }
+    val uiState by thoughtViewModel.uiState.collectAsState()
+    val snackbarHostState = remember { SnackbarHostState() }
+    val coroutineScope = rememberCoroutineScope()
+    val currentTab = uiState.selectedTab
+    val searchQuery = uiState.searchQueries[currentTab].orEmpty()
+    val sortRecentFirst = uiState.sortRecentFirst
+    val notificationPermissionLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.RequestPermission()
+    ) { }
+
+    LaunchedEffect(thoughtViewModel) {
+        thoughtViewModel.events.collect { event ->
+            if (event == ThoughtUiEvent.RequestNotificationPermission &&
+                Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU
+            ) {
+                notificationPermissionLauncher.launch(Manifest.permission.POST_NOTIFICATIONS)
+            }
+        }
+    }
+
+    fun applySearchAndSort(thoughts: List<Thought>): List<Thought> {
+        val filteredThoughts = if (searchQuery.isBlank()) {
+            thoughts
+        } else {
+            thoughts.filter { thought ->
+                thought.content.contains(searchQuery.trim(), ignoreCase = true)
+            }
+        }
+
+        return if (sortRecentFirst) {
+            filteredThoughts.sortedByDescending { it.id }
+        } else {
+            filteredThoughts.sortedBy { it.id }
+        }
+    }
+
+    val inboxThoughts = applySearchAndSort(
+        uiState.thoughts.filter { it.status == ThoughtStatus.INBOX }
+    )
+    val todayThoughts = applySearchAndSort(
+        uiState.thoughts.filter { it.status == ThoughtStatus.TODAY }
+    )
+    val laterThoughts = applySearchAndSort(
+        uiState.thoughts.filter { it.status == ThoughtStatus.LATER }
+    )
+    val doneThoughts = applySearchAndSort(
+        uiState.thoughts.filter { it.status == ThoughtStatus.DONE }
+    )
+
+    fun showUndoSnackbar(message: String, originalThought: Thought) {
+        coroutineScope.launch {
+            snackbarHostState.currentSnackbarData?.dismiss()
+            val result = snackbarHostState.showSnackbar(
+                message = message,
+                actionLabel = "Undo",
+                withDismissAction = true,
+                duration = SnackbarDuration.Short
+            )
+
+            if (result == SnackbarResult.ActionPerformed) {
+                thoughtViewModel.restoreThought(originalThought)
+            }
+        }
+    }
+
+    fun handleDone(thought: Thought) {
+        thoughtViewModel.markThoughtDone(thought.id)
+        showUndoSnackbar("Thought marked as done", thought)
+    }
+
+    fun handleDelete(thought: Thought) {
+        thoughtViewModel.deleteThought(thought.id)
+        showUndoSnackbar("Thought deleted", thought)
+    }
+
+    Scaffold(
+        modifier = Modifier.fillMaxSize(),
+        topBar = {
+            Column(modifier = Modifier.fillMaxWidth()) {
+                CenterAlignedTopAppBar(
+                    title = {
+                        Text(
+                            when (currentTab) {
+                                ThoughtTab.INBOX -> "Inbox"
+                                ThoughtTab.TODAY -> "Today"
+                                ThoughtTab.LATER -> "Later"
+                                ThoughtTab.DONE -> "Done"
+                            }
+                        )
+                    }
+                )
+
+                SearchBar(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = 16.dp)
+                        .testTag("search_bar"),
+                    inputField = {
+                        SearchBarDefaults.InputField(
+                            modifier = Modifier.testTag("search_input"),
+                            query = searchQuery,
+                            onQueryChange = {
+                                thoughtViewModel.updateSearchQuery(currentTab, it)
+                            },
+                            onSearch = { isSearchExpanded = false },
+                            expanded = isSearchExpanded,
+                            onExpandedChange = { isSearchExpanded = it },
+                            placeholder = { Text("Search in current tab") }
+                        )
+                    },
+                    expanded = isSearchExpanded,
+                    onExpandedChange = { isSearchExpanded = it }
+                ) {}
+
+                androidx.compose.foundation.layout.Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = 16.dp, vertical = 8.dp),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    FilterChip(
+                        selected = sortRecentFirst,
+                        onClick = { thoughtViewModel.setSortRecentFirst(true) },
+                        modifier = Modifier.testTag("sort_recent"),
+                        label = { Text("Recent") }
+                    )
+                    FilterChip(
+                        selected = !sortRecentFirst,
+                        onClick = { thoughtViewModel.setSortRecentFirst(false) },
+                        modifier = Modifier.testTag("sort_oldest"),
+                        label = { Text("Oldest") }
+                    )
+                }
+            }
+        },
+        snackbarHost = {
+            SnackbarHost(hostState = snackbarHostState)
+        },
+        bottomBar = {
+            NavigationBar {
+                NavigationBarItem(
+                    selected = currentTab == ThoughtTab.INBOX,
+                    onClick = { thoughtViewModel.updateSelectedTab(ThoughtTab.INBOX) },
+                    modifier = Modifier.testTag("tab_inbox"),
+                    icon = {},
+                    label = { Text("Inbox") }
+                )
+                NavigationBarItem(
+                    selected = currentTab == ThoughtTab.TODAY,
+                    onClick = { thoughtViewModel.updateSelectedTab(ThoughtTab.TODAY) },
+                    modifier = Modifier.testTag("tab_today"),
+                    icon = {},
+                    label = { Text("Today") }
+                )
+                NavigationBarItem(
+                    selected = currentTab == ThoughtTab.LATER,
+                    onClick = { thoughtViewModel.updateSelectedTab(ThoughtTab.LATER) },
+                    modifier = Modifier.testTag("tab_later"),
+                    icon = {},
+                    label = { Text("Later") }
+                )
+                NavigationBarItem(
+                    selected = currentTab == ThoughtTab.DONE,
+                    onClick = { thoughtViewModel.updateSelectedTab(ThoughtTab.DONE) },
+                    modifier = Modifier.testTag("tab_done"),
+                    icon = {},
+                    label = { Text("Done") }
+                )
+            }
+        }
+    ) { innerPadding ->
+        Surface(
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(innerPadding)
+        ) {
+            when (currentTab) {
+                ThoughtTab.INBOX -> InboxScreen(
+                    thoughts = inboxThoughts,
+                    onAddThought = thoughtViewModel::addThought,
+                    onMoveToToday = { thoughtViewModel.updateThoughtStatus(it, ThoughtStatus.TODAY) },
+                    onMoveToLater = { thoughtViewModel.updateThoughtStatus(it, ThoughtStatus.LATER) },
+                    onMarkDone = ::handleDone,
+                    onDeleteThought = ::handleDelete,
+                    onEditThought = thoughtViewModel::updateThoughtContent,
+                    onSetReminder = thoughtViewModel::updateThoughtReminder,
+                    onClearReminder = { thoughtViewModel.updateThoughtReminder(it, null) }
+                )
+
+                ThoughtTab.TODAY -> TodayScreen(
+                    thoughts = todayThoughts,
+                    onMoveToInbox = { thoughtViewModel.updateThoughtStatus(it, ThoughtStatus.INBOX) },
+                    onMoveToLater = { thoughtViewModel.updateThoughtStatus(it, ThoughtStatus.LATER) },
+                    onMarkDone = ::handleDone,
+                    onDeleteThought = ::handleDelete,
+                    onEditThought = thoughtViewModel::updateThoughtContent,
+                    onSetReminder = thoughtViewModel::updateThoughtReminder,
+                    onClearReminder = { thoughtViewModel.updateThoughtReminder(it, null) }
+                )
+
+                ThoughtTab.LATER -> LaterScreen(
+                    thoughts = laterThoughts,
+                    onMoveToInbox = { thoughtViewModel.updateThoughtStatus(it, ThoughtStatus.INBOX) },
+                    onMoveToToday = { thoughtViewModel.updateThoughtStatus(it, ThoughtStatus.TODAY) },
+                    onMarkDone = ::handleDone,
+                    onDeleteThought = ::handleDelete,
+                    onEditThought = thoughtViewModel::updateThoughtContent,
+                    onSetReminder = thoughtViewModel::updateThoughtReminder,
+                    onClearReminder = { thoughtViewModel.updateThoughtReminder(it, null) }
+                )
+
+                ThoughtTab.DONE -> DoneScreen(
+                    thoughts = doneThoughts,
+                    onMoveToInbox = { thoughtViewModel.updateThoughtStatus(it, ThoughtStatus.INBOX) },
+                    onDeleteThought = ::handleDelete,
+                    onEditThought = thoughtViewModel::updateThoughtContent
+                )
+            }
+        }
+    }
+}
