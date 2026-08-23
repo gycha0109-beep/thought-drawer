@@ -8,6 +8,7 @@ import android.content.Context
 import android.content.Intent
 import android.content.pm.PackageManager
 import android.os.Build
+import android.provider.Settings
 import androidx.core.app.NotificationCompat
 import androidx.core.app.NotificationManagerCompat
 import androidx.core.app.RemoteInput
@@ -71,12 +72,24 @@ object CaptureNotificationManager {
         NotificationManagerCompat.from(appContext).notify(NOTIFICATION_ID, notification)
     }
 
-    fun canPostNotifications(context: Context): Boolean {
+    fun hasRuntimePermission(context: Context): Boolean {
         return Build.VERSION.SDK_INT < Build.VERSION_CODES.TIRAMISU ||
             ContextCompat.checkSelfPermission(
                 context,
                 Manifest.permission.POST_NOTIFICATIONS
             ) == PackageManager.PERMISSION_GRANTED
+    }
+
+    fun canPostNotifications(context: Context): Boolean {
+        return hasRuntimePermission(context) &&
+            NotificationManagerCompat.from(context).areNotificationsEnabled()
+    }
+
+    fun openNotificationSettings(context: Context) {
+        val intent = Intent(Settings.ACTION_APP_NOTIFICATION_SETTINGS)
+            .putExtra(Settings.EXTRA_APP_PACKAGE, context.packageName)
+            .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+        context.startActivity(intent)
     }
 
     private fun createChannel(context: Context) {
