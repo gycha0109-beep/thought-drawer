@@ -7,4 +7,10 @@
     <string name="quick_add_title">빠른 추가</string>
     <string name="quick_add_hint">생각을 입력하세요</string>
     <string name="quick_add_save">저장</string>
+    <string name="capture_notification_channel_name">빠른 생각 추가</string>
+    <string name="capture_notification_channel_description">알림창에서 생각을 바로 입력합니다</string>
+    <string name="capture_notification_title">생각서랍</string>
+    <string name="capture_notification_text">생각이 스치면 바로 넣어두세요</string>
+    <string name="capture_notification_action">생각 추가</string>
+    <string name="capture_notification_input_label">생각을 입력하세요</string>
 </resources>
