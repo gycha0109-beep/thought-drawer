@@ -7,9 +7,9 @@ import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.border
 import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ExperimentalLayoutApi
 import androidx.compose.foundation.layout.FlowRow
-import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
@@ -34,6 +34,7 @@ import androidx.compose.ui.semantics.CustomAccessibilityAction
 import androidx.compose.ui.semantics.customActions
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.dp
+import com.example.brainclean.capture.ThoughtShareLauncher
 import com.example.brainclean.model.Thought
 import java.text.DateFormat
 import java.util.Calendar
@@ -112,6 +113,16 @@ fun ThoughtItem(
                 }
             )
         }
+        add(
+            CustomAccessibilityAction("Share thought") {
+                if (!isEditing) {
+                    ThoughtShareLauncher.share(context, thought.content)
+                    true
+                } else {
+                    false
+                }
+            }
+        )
         add(
             CustomAccessibilityAction("Delete thought") {
                 if (!isEditing) {
@@ -307,6 +318,14 @@ fun ThoughtItem(
 
                         TextButton(onClick = { isEditing = true }) {
                             Text("Edit")
+                        }
+
+                        TextButton(
+                            onClick = {
+                                ThoughtShareLauncher.share(context, thought.content)
+                            }
+                        ) {
+                            Text("Share")
                         }
 
                         TextButton(onClick = onDeleteClick) {
