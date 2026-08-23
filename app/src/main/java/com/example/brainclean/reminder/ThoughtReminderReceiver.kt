@@ -25,6 +25,10 @@ class ThoughtReminderReceiver : BroadcastReceiver() {
                 val inboxEnteredAt = intent.getLongExtra(EXTRA_INBOX_ENTERED_AT, -1L)
                 if (thoughtId == -1L) return@launch
 
+                // Do not clear remindAt/stale state unless Android can actually display
+                // the notification. A later app sync can recover overdue reminders.
+                if (!ThoughtReminderNotifier.canPostNotifications(context)) return@launch
+
                 val repository = ThoughtRepository(
                     BrainCleanDatabase.getDatabase(context).thoughtDao()
                 )
