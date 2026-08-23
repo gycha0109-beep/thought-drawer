@@ -4,7 +4,8 @@ import android.content.BroadcastReceiver
 import android.content.Context
 import android.content.Intent
 import com.example.brainclean.data.BrainCleanDatabase
-import com.example.brainclean.model.ThoughtStatus
+import com.example.brainclean.data.ThoughtRepository
+import com.example.brainclean.domain.ThoughtCommandService
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
@@ -16,11 +17,14 @@ class ThoughtReminderRescheduleReceiver : BroadcastReceiver() {
         val pendingResult = goAsync()
         CoroutineScope(Dispatchers.IO).launch {
             try {
-                val thoughtDao = BrainCleanDatabase.getDatabase(context).thoughtDao()
-                val scheduler = ThoughtReminderScheduler(context)
-                thoughtDao.getAllThoughts().forEach { thoughtEntity ->
-                    scheduler.syncReminder(thoughtEntity.toThought())
-                }
+                val repository = ThoughtRepository(
+                    BrainCleanDatabase.getDatabase(context).thoughtDao()
+                )
+                val commandService = ThoughtCommandService(
+                    context = context.applicationContext,
+                    repository = repository
+                )
+                commandService.syncScheduledReminders()
             } finally {
                 pendingResult.finish()
             }
