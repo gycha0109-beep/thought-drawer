@@ -31,6 +31,15 @@ object CaptureNotificationManager {
         createChannel(appContext)
 
         if (!canPostNotifications(appContext)) return
+        if (
+            Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU &&
+            ContextCompat.checkSelfPermission(
+                appContext,
+                Manifest.permission.POST_NOTIFICATIONS
+            ) != PackageManager.PERMISSION_GRANTED
+        ) {
+            return
+        }
 
         val remoteInput = RemoteInput.Builder(KEY_CAPTURE_TEXT)
             .setLabel(appContext.getString(R.string.capture_notification_input_label))

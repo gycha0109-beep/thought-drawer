@@ -1,5 +1,6 @@
 package com.example.brainclean.capture
 
+import android.annotation.SuppressLint
 import android.app.PendingIntent
 import android.content.Intent
 import android.os.Build
@@ -28,8 +29,7 @@ class ThoughtCaptureTileService : TileService() {
                 )
                 startActivityAndCollapse(pendingIntent)
             } else {
-                @Suppress("DEPRECATION")
-                startActivityAndCollapse(intent)
+                startLegacyActivityAndCollapse(intent)
             }
         }
 
@@ -38,6 +38,12 @@ class ThoughtCaptureTileService : TileService() {
         } else {
             launchQuickAdd.run()
         }
+    }
+
+    @SuppressLint("StartActivityAndCollapseDeprecated")
+    @Suppress("DEPRECATION")
+    private fun startLegacyActivityAndCollapse(intent: Intent) {
+        startActivityAndCollapse(intent)
     }
 
     companion object {

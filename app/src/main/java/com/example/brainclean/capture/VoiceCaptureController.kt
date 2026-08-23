@@ -1,12 +1,15 @@
 package com.example.brainclean.capture
 
+import android.Manifest
 import android.content.Context
 import android.content.Intent
+import android.content.pm.PackageManager
 import android.os.Build
 import android.os.Bundle
 import android.speech.RecognitionListener
 import android.speech.RecognizerIntent
 import android.speech.SpeechRecognizer
+import androidx.core.content.ContextCompat
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -29,6 +32,16 @@ class VoiceCaptureController(
     private var speechRecognizer: SpeechRecognizer? = null
 
     fun startListening() {
+        if (
+            ContextCompat.checkSelfPermission(
+                appContext,
+                Manifest.permission.RECORD_AUDIO
+            ) != PackageManager.PERMISSION_GRANTED
+        ) {
+            _state.value = VoiceCaptureState.Error("마이크 권한을 확인해 주세요")
+            return
+        }
+
         val recognizer = getOrCreateRecognizer() ?: run {
             _state.value = VoiceCaptureState.Unavailable
             return

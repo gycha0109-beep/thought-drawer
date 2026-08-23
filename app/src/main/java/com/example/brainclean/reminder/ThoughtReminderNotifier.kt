@@ -57,6 +57,15 @@ class ThoughtReminderNotifier(
         createNotificationChannels(appContext)
 
         if (!canPostNotifications(appContext)) return
+        if (
+            Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU &&
+            ContextCompat.checkSelfPermission(
+                appContext,
+                Manifest.permission.POST_NOTIFICATIONS
+            ) != PackageManager.PERMISSION_GRANTED
+        ) {
+            return
+        }
 
         val contentIntent = PendingIntent.getActivity(
             appContext,
