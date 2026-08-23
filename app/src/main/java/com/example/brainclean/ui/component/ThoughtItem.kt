@@ -16,11 +16,12 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.material3.Button
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
+import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -30,10 +31,12 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.semantics.CustomAccessibilityAction
 import androidx.compose.ui.semantics.customActions
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.dp
+import com.example.brainclean.R
 import com.example.brainclean.capture.ThoughtShareLauncher
 import com.example.brainclean.model.Thought
 import java.text.DateFormat
@@ -57,7 +60,7 @@ fun ThoughtItem(
     onEditThought: (String) -> Unit,
     onSetReminder: (Long) -> Unit,
     onClearReminder: () -> Unit,
-    enableDoneSwipe: Boolean = true,
+    enableDoneAction: Boolean = true,
     enableReminder: Boolean = true
 ) {
     val context = LocalContext.current
@@ -101,7 +104,7 @@ fun ThoughtItem(
                 }
             )
         }
-        if (enableDoneSwipe) {
+        if (enableDoneAction) {
             add(
                 CustomAccessibilityAction("Mark as done") {
                     if (!isEditing) {
@@ -168,7 +171,7 @@ fun ThoughtItem(
         .semantics {
             customActions = accessibilityActions
         }
-        .padding(vertical = 4.dp)
+        .padding(vertical = 3.dp)
 
     val cardColors = CardDefaults.cardColors(
         containerColor = if (isSelected) Color(0xFFF3F4F6) else Color.White
@@ -184,7 +187,7 @@ fun ThoughtItem(
         ),
         colors = cardColors
     ) {
-        Column(modifier = Modifier.padding(horizontal = 14.dp, vertical = 12.dp)) {
+        Column(modifier = Modifier.padding(horizontal = 12.dp, vertical = 10.dp)) {
             if (isEditing) {
                 OutlinedTextField(
                     value = editedText,
@@ -196,7 +199,7 @@ fun ThoughtItem(
                 Row(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .padding(top = 10.dp),
+                        .padding(top = 8.dp),
                     horizontalArrangement = Arrangement.spacedBy(6.dp)
                 ) {
                     Button(
@@ -230,7 +233,7 @@ fun ThoughtItem(
                 metadataText?.let { label ->
                     Text(
                         text = label,
-                        modifier = Modifier.padding(top = 6.dp),
+                        modifier = Modifier.padding(top = 4.dp),
                         style = MaterialTheme.typography.bodySmall,
                         color = Color(0xFF6B7280)
                     )
@@ -240,7 +243,7 @@ fun ThoughtItem(
                     thought.remindAt?.takeIf { isReminderDetailsVisible }?.let {
                         Text(
                             text = "Reminder: ${reminderFormatter.format(it)}",
-                            modifier = Modifier.padding(top = 4.dp),
+                            modifier = Modifier.padding(top = 3.dp),
                             style = MaterialTheme.typography.bodySmall,
                             color = Color(0xFF6B7280)
                         )
@@ -251,7 +254,7 @@ fun ThoughtItem(
                     FlowRow(
                         modifier = Modifier
                             .fillMaxWidth()
-                            .padding(top = 10.dp),
+                            .padding(top = 8.dp),
                         horizontalArrangement = Arrangement.spacedBy(6.dp),
                         verticalArrangement = Arrangement.spacedBy(6.dp)
                     ) {
@@ -268,30 +271,29 @@ fun ThoughtItem(
 
                 if (!isSelectionMode) {
                     FlowRow(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(top = 4.dp),
-                        horizontalArrangement = Arrangement.spacedBy(4.dp, Alignment.End),
-                        verticalArrangement = Arrangement.spacedBy(4.dp)
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(0.dp, Alignment.End),
+                        verticalArrangement = Arrangement.spacedBy(0.dp)
                     ) {
-                        if (enableReminder) {
-                            if (thought.remindAt != null) {
-                                TextButton(
-                                    onClick = {
-                                        isReminderDetailsVisible = !isReminderDetailsVisible
-                                    }
-                                ) {
-                                    Text(
-                                        if (isReminderDetailsVisible) {
-                                            "Hide reminder"
-                                        } else {
-                                            "Show reminder"
-                                        }
-                                    )
+                        if (enableReminder && thought.remindAt != null) {
+                            IconButton(
+                                onClick = {
+                                    isReminderDetailsVisible = !isReminderDetailsVisible
                                 }
+                            ) {
+                                Icon(
+                                    painter = painterResource(R.drawable.ic_action_reminder_info),
+                                    contentDescription = if (isReminderDetailsVisible) {
+                                        "Hide reminder details"
+                                    } else {
+                                        "Show reminder details"
+                                    }
+                                )
                             }
+                        }
 
-                            TextButton(
+                        if (enableReminder) {
+                            IconButton(
                                 onClick = {
                                     openReminderPicker(
                                         context = context,
@@ -300,36 +302,59 @@ fun ThoughtItem(
                                     )
                                 }
                             ) {
-                                Text(if (thought.remindAt == null) "Remind" else "Change reminder")
+                                Icon(
+                                    painter = painterResource(R.drawable.ic_action_reminder_set),
+                                    contentDescription = if (thought.remindAt == null) {
+                                        "Set reminder"
+                                    } else {
+                                        "Change reminder"
+                                    }
+                                )
                             }
 
                             if (thought.remindAt != null) {
-                                TextButton(onClick = onClearReminder) {
-                                    Text("Clear reminder")
+                                IconButton(onClick = onClearReminder) {
+                                    Icon(
+                                        painter = painterResource(R.drawable.ic_action_reminder_clear),
+                                        contentDescription = "Clear reminder"
+                                    )
                                 }
                             }
                         }
 
-                        if (enableDoneSwipe) {
-                            TextButton(onClick = onDoneClick) {
-                                Text("Done")
+                        if (enableDoneAction) {
+                            IconButton(onClick = onDoneClick) {
+                                Icon(
+                                    painter = painterResource(R.drawable.ic_action_done),
+                                    contentDescription = "Mark as done"
+                                )
                             }
                         }
 
-                        TextButton(onClick = { isEditing = true }) {
-                            Text("Edit")
+                        IconButton(onClick = { isEditing = true }) {
+                            Icon(
+                                painter = painterResource(R.drawable.ic_action_edit),
+                                contentDescription = "Edit thought"
+                            )
                         }
 
-                        TextButton(
+                        IconButton(
                             onClick = {
                                 ThoughtShareLauncher.share(context, thought.content)
                             }
                         ) {
-                            Text("Share")
+                            Icon(
+                                painter = painterResource(R.drawable.ic_action_share),
+                                contentDescription = "Share thought"
+                            )
                         }
 
-                        TextButton(onClick = onDeleteClick) {
-                            Text("Delete")
+                        IconButton(onClick = onDeleteClick) {
+                            Icon(
+                                painter = painterResource(R.drawable.ic_action_delete),
+                                contentDescription = "Delete thought",
+                                tint = MaterialTheme.colorScheme.error
+                            )
                         }
                     }
                 }
