@@ -44,6 +44,14 @@ class QuickAddActivity : ComponentActivity() {
         )
     }
 
+    private val captureSource: CaptureSource by lazy {
+        intent.getStringExtra(EXTRA_CAPTURE_SOURCE)
+            ?.let { sourceName ->
+                CaptureSource.entries.firstOrNull { it.name == sourceName }
+            }
+            ?: CaptureSource.WIDGET
+    }
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         window.setSoftInputMode(WindowManager.LayoutParams.SOFT_INPUT_STATE_ALWAYS_VISIBLE)
@@ -62,13 +70,17 @@ class QuickAddActivity : ComponentActivity() {
             when (
                 commandService.captureThought(
                     content = content,
-                    source = CaptureSource.WIDGET
+                    source = captureSource
                 )
             ) {
                 CaptureResult.Blank -> Unit
                 is CaptureResult.Success -> finish()
             }
         }
+    }
+
+    companion object {
+        const val EXTRA_CAPTURE_SOURCE = "extra_capture_source"
     }
 }
 
