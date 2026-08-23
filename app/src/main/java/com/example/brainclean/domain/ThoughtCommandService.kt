@@ -6,6 +6,7 @@ import com.example.brainclean.model.CaptureSource
 import com.example.brainclean.model.Thought
 import com.example.brainclean.model.ThoughtStatus
 import com.example.brainclean.reminder.ReminderSyncResult
+import com.example.brainclean.reminder.StaleInboxScheduler
 import com.example.brainclean.reminder.ThoughtReminderScheduler
 import com.example.brainclean.widget.BrainCleanHomeWidget
 
@@ -21,7 +22,8 @@ sealed interface CaptureResult {
 class ThoughtCommandService(
     private val context: Context,
     private val repository: ThoughtRepository,
-    private val reminderScheduler: ThoughtReminderScheduler = ThoughtReminderScheduler(context)
+    private val reminderScheduler: ThoughtReminderScheduler = ThoughtReminderScheduler(context),
+    private val staleInboxScheduler: StaleInboxScheduler = StaleInboxScheduler(context)
 ) {
     suspend fun captureThought(
         content: String,
@@ -43,7 +45,7 @@ class ThoughtCommandService(
         )
 
         repository.insert(thought)
-        val reminderSyncResult = reminderScheduler.syncReminder(thought)
+        val reminderSyncResult = reminderScheduler.syncReminder(thought) + syncStaleInbox(thought)
         BrainCleanHomeWidget.refreshAll(context)
 
         return CaptureResult.Success(
@@ -80,7 +82,7 @@ class ThoughtCommandService(
         }
 
         repository.update(updatedThought)
-        val result = reminderScheduler.syncReminder(updatedThought)
+        val result = reminderScheduler.syncReminder(updatedThought) + syncStaleInbox(updatedThought)
         BrainCleanHomeWidget.refreshAll(context)
         return result
     }
@@ -108,7 +110,7 @@ class ThoughtCommandService(
         )
 
         repository.update(updatedThought)
-        val result = reminderScheduler.syncReminder(updatedThought)
+        val result = reminderScheduler.syncReminder(updatedThought) + syncStaleInbox(updatedThought)
         BrainCleanHomeWidget.refreshAll(context)
         return result
     }
@@ -130,7 +132,8 @@ class ThoughtCommandService(
         val existingThought = repository.getThought(id) ?: return
 
         reminderScheduler.cancelReminder(existingThought.id)
-        reminderScheduler.cancelStaleInboxReminder(existingThought.id)
+        reminderScheduler.cancelLegacyStaleInboxReminder(existingThought.id)
+        staleInboxScheduler.cancel(existingThought.id)
         repository.delete(existingThought)
         BrainCleanHomeWidget.refreshAll(context)
     }
@@ -143,7 +146,8 @@ class ThoughtCommandService(
 
         thoughts.forEach { thought ->
             reminderScheduler.cancelReminder(thought.id)
-            reminderScheduler.cancelStaleInboxReminder(thought.id)
+            reminderScheduler.cancelLegacyStaleInboxReminder(thought.id)
+            staleInboxScheduler.cancel(thought.id)
         }
         repository.deleteMany(thoughts)
         BrainCleanHomeWidget.refreshAll(context)
@@ -151,7 +155,7 @@ class ThoughtCommandService(
 
     suspend fun restoreThought(thought: Thought): ReminderSyncResult {
         repository.insert(thought)
-        val result = reminderScheduler.syncReminder(thought)
+        val result = reminderScheduler.syncReminder(thought) + syncStaleInbox(thought)
         BrainCleanHomeWidget.refreshAll(context)
         return result
     }
@@ -171,6 +175,7 @@ class ThoughtCommandService(
         val updatedThought = currentThought.copy(remindAt = null)
         repository.update(updatedThought)
         reminderScheduler.syncReminder(updatedThought)
+        syncStaleInbox(updatedThought)
         BrainCleanHomeWidget.refreshAll(context)
         return updatedThought
     }
@@ -192,13 +197,26 @@ class ThoughtCommandService(
             staleInboxReminderSentAt = System.currentTimeMillis()
         )
         repository.update(updatedThought)
+        reminderScheduler.cancelLegacyStaleInboxReminder(updatedThought.id)
+        staleInboxScheduler.cancel(updatedThought.id)
         BrainCleanHomeWidget.refreshAll(context)
         return updatedThought
     }
 
     suspend fun syncScheduledReminders(): ReminderSyncResult {
         return repository.getAllThoughts().fold(ReminderSyncResult()) { acc, thought ->
+            acc + reminderScheduler.syncReminder(thought) + syncStaleInbox(thought)
+        }
+    }
+
+    suspend fun syncExplicitReminders(): ReminderSyncResult {
+        return repository.getAllThoughts().fold(ReminderSyncResult()) { acc, thought ->
             acc + reminderScheduler.syncReminder(thought)
         }
+    }
+
+    private fun syncStaleInbox(thought: Thought): ReminderSyncResult {
+        reminderScheduler.cancelLegacyStaleInboxReminder(thought.id)
+        return staleInboxScheduler.sync(thought)
     }
 }
