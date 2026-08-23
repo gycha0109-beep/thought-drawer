@@ -1,5 +1,6 @@
 package com.example.brainclean.capture
 
+import android.app.Activity
 import android.content.Context
 import android.content.Intent
 import com.example.brainclean.R
@@ -15,7 +16,11 @@ object ThoughtShareLauncher {
         val chooser = Intent.createChooser(
             sendIntent,
             context.getString(R.string.share_thought_chooser_title)
-        )
+        ).apply {
+            if (context !is Activity) {
+                addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+            }
+        }
 
         context.startActivity(chooser)
     }
