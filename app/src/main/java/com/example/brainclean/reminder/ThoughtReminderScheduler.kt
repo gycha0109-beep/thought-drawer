@@ -9,6 +9,7 @@ import android.content.pm.PackageManager
 import android.os.Build
 import androidx.core.content.ContextCompat
 import com.example.brainclean.model.Thought
+import kotlin.math.max
 
 data class ReminderSyncResult(
     val needsExactAlarmPermission: Boolean = false,
@@ -30,9 +31,9 @@ class ThoughtReminderScheduler(
     fun syncReminder(thought: Thought): ReminderSyncResult {
         cancelReminder(thought.id)
 
-        val triggerAt = thought.remindAt
-            ?.takeIf { it > System.currentTimeMillis() }
-            ?: return ReminderSyncResult()
+        val expectedRemindAt = thought.remindAt ?: return ReminderSyncResult()
+        val now = System.currentTimeMillis()
+        val alarmAt = max(expectedRemindAt, now + OVERDUE_RETRY_DELAY_MS)
 
         val needsExactAlarmPermission = Build.VERSION.SDK_INT >= Build.VERSION_CODES.S &&
             !alarmManager.canScheduleExactAlarms()
@@ -43,19 +44,19 @@ class ThoughtReminderScheduler(
             ) != PackageManager.PERMISSION_GRANTED
         val pendingIntent = createStandardPendingIntent(
             thoughtId = thought.id,
-            triggerAt = triggerAt
+            expectedRemindAt = expectedRemindAt
         )
 
         if (needsExactAlarmPermission) {
             alarmManager.setAndAllowWhileIdle(
                 AlarmManager.RTC_WAKEUP,
-                triggerAt,
+                alarmAt,
                 pendingIntent
             )
         } else {
             alarmManager.setExactAndAllowWhileIdle(
                 AlarmManager.RTC_WAKEUP,
-                triggerAt,
+                alarmAt,
                 pendingIntent
             )
         }
@@ -70,7 +71,7 @@ class ThoughtReminderScheduler(
         alarmManager.cancel(
             createStandardPendingIntent(
                 thoughtId = thoughtId,
-                triggerAt = 0L
+                expectedRemindAt = 0L
             )
         )
     }
@@ -87,12 +88,12 @@ class ThoughtReminderScheduler(
 
     private fun createStandardPendingIntent(
         thoughtId: Long,
-        triggerAt: Long
+        expectedRemindAt: Long
     ): PendingIntent {
         val intent = Intent(context, ThoughtReminderReceiver::class.java)
             .setAction(ThoughtReminderReceiver.ACTION_SHOW_REMINDER)
             .putExtra(ThoughtReminderReceiver.EXTRA_THOUGHT_ID, thoughtId)
-            .putExtra(ThoughtReminderReceiver.EXTRA_REMIND_AT, triggerAt)
+            .putExtra(ThoughtReminderReceiver.EXTRA_REMIND_AT, expectedRemindAt)
 
         return PendingIntent.getBroadcast(
             context,
@@ -131,5 +132,6 @@ class ThoughtReminderScheduler(
 
     companion object {
         private const val REQUEST_CODE_MULTIPLIER = 31
+        private const val OVERDUE_RETRY_DELAY_MS = 1_000L
     }
 }
