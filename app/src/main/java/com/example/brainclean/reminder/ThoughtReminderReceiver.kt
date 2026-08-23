@@ -14,8 +14,8 @@ import androidx.core.app.NotificationManagerCompat
 import androidx.core.content.ContextCompat
 import com.example.brainclean.MainActivity
 import com.example.brainclean.data.BrainCleanDatabase
-import com.example.brainclean.data.ThoughtEntity
-import com.example.brainclean.model.ThoughtStatus
+import com.example.brainclean.data.ThoughtRepository
+import com.example.brainclean.domain.ThoughtCommandService
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
@@ -34,43 +34,42 @@ class ThoughtReminderReceiver : BroadcastReceiver() {
                 val inboxEnteredAt = intent.getLongExtra(EXTRA_INBOX_ENTERED_AT, -1L)
                 if (thoughtId == -1L || remindAt == -1L) return@launch
 
-                val thoughtDao = BrainCleanDatabase.getDatabase(context).thoughtDao()
-                val currentThought = thoughtDao.getThoughtById(thoughtId)?.toThought() ?: return@launch
+                val repository = ThoughtRepository(
+                    BrainCleanDatabase.getDatabase(context).thoughtDao()
+                )
+                val commandService = ThoughtCommandService(
+                    context = context.applicationContext,
+                    repository = repository
+                )
 
                 when (intent.action) {
                     ACTION_SHOW_REMINDER -> {
-                        if (currentThought.status == ThoughtStatus.DONE || currentThought.remindAt != remindAt) {
-                            return@launch
-                        }
+                        val deliveredThought = commandService.consumeExplicitReminder(
+                            id = thoughtId,
+                            expectedRemindAt = remindAt
+                        ) ?: return@launch
 
-                        thoughtDao.insertThought(
-                            ThoughtEntity.fromThought(currentThought.copy(remindAt = null))
+                        showNotification(
+                            context = context,
+                            notificationId = thoughtId,
+                            title = "Thought reminder",
+                            thoughtContent = deliveredThought.content
                         )
-
-                        showNotification(context, thoughtId, "Thought reminder", currentThought.content)
                     }
 
                     ACTION_SHOW_STALE_INBOX_REMINDER -> {
-                        if (
-                            inboxEnteredAt == -1L ||
-                            currentThought.status != ThoughtStatus.INBOX ||
-                            currentThought.inboxEnteredAt != inboxEnteredAt ||
-                            currentThought.staleInboxReminderSentAt != null
-                        ) {
-                            return@launch
-                        }
+                        if (inboxEnteredAt == -1L) return@launch
 
-                        thoughtDao.insertThought(
-                            ThoughtEntity.fromThought(
-                                currentThought.copy(staleInboxReminderSentAt = System.currentTimeMillis())
-                            )
-                        )
+                        val deliveredThought = commandService.consumeStaleInboxReminder(
+                            id = thoughtId,
+                            expectedInboxEnteredAt = inboxEnteredAt
+                        ) ?: return@launch
 
                         showNotification(
-                            context,
-                            thoughtId + STALE_NOTIFICATION_ID_OFFSET,
-                            "Inbox thought still waiting",
-                            currentThought.content
+                            context = context,
+                            notificationId = thoughtId + STALE_NOTIFICATION_ID_OFFSET,
+                            title = "Inbox thought still waiting",
+                            thoughtContent = deliveredThought.content
                         )
                     }
                 }
