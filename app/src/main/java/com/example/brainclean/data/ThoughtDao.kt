@@ -10,16 +10,16 @@ import kotlinx.coroutines.flow.Flow
 
 @Dao
 interface ThoughtDao {
-    @Query("SELECT * FROM thoughts ORDER BY id DESC")
+    @Query("SELECT * FROM thoughts ORDER BY createdAt DESC")
     suspend fun getAllThoughts(): List<ThoughtEntity>
 
     @Query("SELECT * FROM thoughts WHERE id = :id LIMIT 1")
     suspend fun getThoughtById(id: Long): ThoughtEntity?
 
-    @Query("SELECT * FROM thoughts ORDER BY id DESC")
+    @Query("SELECT * FROM thoughts ORDER BY createdAt DESC")
     fun observeAllThoughts(): Flow<List<ThoughtEntity>>
 
-    @Query("SELECT * FROM thoughts WHERE status = :status ORDER BY id DESC LIMIT :limit")
+    @Query("SELECT * FROM thoughts WHERE status = :status ORDER BY createdAt DESC LIMIT :limit")
     suspend fun getLatestThoughtsByStatus(status: String, limit: Int): List<ThoughtEntity>
 
     @Query("SELECT * FROM thoughts WHERE remindAt IS NOT NULL AND status != :doneStatus")
