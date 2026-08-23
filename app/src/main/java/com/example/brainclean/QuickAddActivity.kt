@@ -27,14 +27,23 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.lifecycleScope
 import com.example.brainclean.data.BrainCleanDatabase
-import com.example.brainclean.data.ThoughtEntity
-import com.example.brainclean.model.Thought
-import com.example.brainclean.model.ThoughtStatus
+import com.example.brainclean.data.ThoughtRepository
+import com.example.brainclean.domain.CaptureResult
+import com.example.brainclean.domain.ThoughtCommandService
+import com.example.brainclean.model.CaptureSource
 import com.example.brainclean.ui.theme.BrainCleanTheme
-import com.example.brainclean.widget.BrainCleanHomeWidget
 import kotlinx.coroutines.launch
 
 class QuickAddActivity : ComponentActivity() {
+    private val commandService by lazy {
+        ThoughtCommandService(
+            context = applicationContext,
+            repository = ThoughtRepository(
+                BrainCleanDatabase.getDatabase(applicationContext).thoughtDao()
+            )
+        )
+    }
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         window.setSoftInputMode(WindowManager.LayoutParams.SOFT_INPUT_STATE_ALWAYS_VISIBLE)
@@ -42,36 +51,23 @@ class QuickAddActivity : ComponentActivity() {
         setContent {
             BrainCleanTheme {
                 Surface(modifier = Modifier.fillMaxSize()) {
-                    QuickAddScreen(
-                        onSave = { content ->
-                            saveThought(content)
-                        }
-                    )
+                    QuickAddScreen(onSave = ::saveThought)
                 }
             }
         }
     }
 
     private fun saveThought(content: String) {
-        val trimmedContent = content.trim()
-        if (trimmedContent.isBlank()) return
-
         lifecycleScope.launch {
-            val createdAt = System.currentTimeMillis()
-            val thought = Thought(
-                id = createdAt,
-                content = trimmedContent,
-                status = ThoughtStatus.INBOX,
-                createdAt = createdAt,
-                inboxEnteredAt = createdAt
-            )
-
-            BrainCleanDatabase.getDatabase(applicationContext)
-                .thoughtDao()
-                .insertThought(ThoughtEntity.fromThought(thought))
-
-            BrainCleanHomeWidget.refreshAll(applicationContext)
-            finish()
+            when (
+                commandService.captureThought(
+                    content = content,
+                    source = CaptureSource.WIDGET
+                )
+            ) {
+                CaptureResult.Blank -> Unit
+                is CaptureResult.Success -> finish()
+            }
         }
     }
 }
