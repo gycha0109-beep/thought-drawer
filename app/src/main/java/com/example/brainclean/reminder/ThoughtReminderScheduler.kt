@@ -29,25 +29,10 @@ class ThoughtReminderScheduler(
 
     fun syncReminder(thought: Thought): ReminderSyncResult {
         cancelReminder(thought.id)
-        cancelStaleInboxReminder(thought.id)
 
-        val scheduledTimes = buildList {
-            thought.remindAt
-                ?.takeIf { it > System.currentTimeMillis() }
-                ?.let { add(ReminderSpec(AlarmType.STANDARD, it)) }
-
-            if (
-                thought.status.name == "INBOX" &&
-                thought.staleInboxReminderSentAt == null
-            ) {
-                val staleTriggerAt = thought.inboxEnteredAt + STALE_INBOX_REMINDER_DELAY_MS
-                if (staleTriggerAt > System.currentTimeMillis()) {
-                    add(ReminderSpec(AlarmType.STALE_INBOX, staleTriggerAt))
-                }
-            }
-        }
-
-        if (scheduledTimes.isEmpty()) return ReminderSyncResult()
+        val triggerAt = thought.remindAt
+            ?.takeIf { it > System.currentTimeMillis() }
+            ?: return ReminderSyncResult()
 
         val needsExactAlarmPermission = Build.VERSION.SDK_INT >= Build.VERSION_CODES.S &&
             !alarmManager.canScheduleExactAlarms()
@@ -56,20 +41,23 @@ class ThoughtReminderScheduler(
                 context,
                 Manifest.permission.POST_NOTIFICATIONS
             ) != PackageManager.PERMISSION_GRANTED
+        val pendingIntent = createStandardPendingIntent(
+            thoughtId = thought.id,
+            triggerAt = triggerAt
+        )
 
-        if (!needsExactAlarmPermission) {
-            scheduledTimes.forEach { reminderSpec ->
-                alarmManager.setExactAndAllowWhileIdle(
-                    AlarmManager.RTC_WAKEUP,
-                    reminderSpec.triggerAt,
-                    createPendingIntent(
-                        thoughtId = thought.id,
-                        triggerAt = reminderSpec.triggerAt,
-                        alarmType = reminderSpec.alarmType,
-                        inboxEnteredAt = thought.inboxEnteredAt
-                    )
-                )
-            }
+        if (needsExactAlarmPermission) {
+            alarmManager.setAndAllowWhileIdle(
+                AlarmManager.RTC_WAKEUP,
+                triggerAt,
+                pendingIntent
+            )
+        } else {
+            alarmManager.setExactAndAllowWhileIdle(
+                AlarmManager.RTC_WAKEUP,
+                triggerAt,
+                pendingIntent
+            )
         }
 
         return ReminderSyncResult(
@@ -80,61 +68,68 @@ class ThoughtReminderScheduler(
 
     fun cancelReminder(thoughtId: Long) {
         alarmManager.cancel(
-            createPendingIntent(
+            createStandardPendingIntent(
                 thoughtId = thoughtId,
-                triggerAt = 0L,
-                alarmType = AlarmType.STANDARD,
-                inboxEnteredAt = 0L
+                triggerAt = 0L
             )
         )
     }
 
-    fun cancelStaleInboxReminder(thoughtId: Long) {
+    fun cancelLegacyStaleInboxReminder(thoughtId: Long) {
         alarmManager.cancel(
-            createPendingIntent(
+            createLegacyStalePendingIntent(
                 thoughtId = thoughtId,
                 triggerAt = 0L,
-                alarmType = AlarmType.STALE_INBOX,
                 inboxEnteredAt = 0L
             )
         )
     }
 
-    private fun createPendingIntent(
+    private fun createStandardPendingIntent(
+        thoughtId: Long,
+        triggerAt: Long
+    ): PendingIntent {
+        val intent = Intent(context, ThoughtReminderReceiver::class.java)
+            .setAction(ThoughtReminderReceiver.ACTION_SHOW_REMINDER)
+            .putExtra(ThoughtReminderReceiver.EXTRA_THOUGHT_ID, thoughtId)
+            .putExtra(ThoughtReminderReceiver.EXTRA_REMIND_AT, triggerAt)
+
+        return PendingIntent.getBroadcast(
+            context,
+            standardRequestCodeFor(thoughtId),
+            intent,
+            PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
+        )
+    }
+
+    private fun createLegacyStalePendingIntent(
         thoughtId: Long,
         triggerAt: Long,
-        alarmType: AlarmType,
         inboxEnteredAt: Long
     ): PendingIntent {
         val intent = Intent(context, ThoughtReminderReceiver::class.java)
-            .setAction(alarmType.action)
+            .setAction(ThoughtReminderReceiver.ACTION_SHOW_STALE_INBOX_REMINDER)
             .putExtra(ThoughtReminderReceiver.EXTRA_THOUGHT_ID, thoughtId)
             .putExtra(ThoughtReminderReceiver.EXTRA_REMIND_AT, triggerAt)
             .putExtra(ThoughtReminderReceiver.EXTRA_INBOX_ENTERED_AT, inboxEnteredAt)
 
         return PendingIntent.getBroadcast(
             context,
-            alarmType.requestCodeFor(thoughtId),
+            legacyStaleRequestCodeFor(thoughtId),
             intent,
             PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
         )
     }
 
-    private data class ReminderSpec(
-        val alarmType: AlarmType,
-        val triggerAt: Long
-    )
+    private fun standardRequestCodeFor(thoughtId: Long): Int {
+        return thoughtId.toInt() * REQUEST_CODE_MULTIPLIER
+    }
 
-    private enum class AlarmType(val action: String) {
-        STANDARD(ThoughtReminderReceiver.ACTION_SHOW_REMINDER),
-        STALE_INBOX(ThoughtReminderReceiver.ACTION_SHOW_STALE_INBOX_REMINDER);
-
-        fun requestCodeFor(thoughtId: Long): Int {
-            return (thoughtId.toInt() * 31) + ordinal
-        }
+    private fun legacyStaleRequestCodeFor(thoughtId: Long): Int {
+        return (thoughtId.toInt() * REQUEST_CODE_MULTIPLIER) + 1
     }
 
     companion object {
-        private const val STALE_INBOX_REMINDER_DELAY_MS = 24 * 60 * 60 * 1000L
+        private const val REQUEST_CODE_MULTIPLIER = 31
     }
 }
