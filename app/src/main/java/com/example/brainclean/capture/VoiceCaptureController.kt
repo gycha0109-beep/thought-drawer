@@ -62,22 +62,35 @@ class VoiceCaptureController(
     private fun getOrCreateRecognizer(): SpeechRecognizer? {
         speechRecognizer?.let { return it }
 
-        val recognizer = when {
-            Build.VERSION.SDK_INT >= Build.VERSION_CODES.S &&
-                SpeechRecognizer.isOnDeviceRecognitionAvailable(appContext) -> {
-                SpeechRecognizer.createOnDeviceSpeechRecognizer(appContext)
-            }
-
-            SpeechRecognizer.isRecognitionAvailable(appContext) -> {
-                SpeechRecognizer.createSpeechRecognizer(appContext)
-            }
-
-            else -> null
-        }
+        val recognizer = tryCreateOnDeviceRecognizer()
+            ?: tryCreateDefaultRecognizer()
 
         recognizer?.setRecognitionListener(this)
         speechRecognizer = recognizer
         return recognizer
+    }
+
+    private fun tryCreateOnDeviceRecognizer(): SpeechRecognizer? {
+        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.S) return null
+        if (!SpeechRecognizer.isOnDeviceRecognitionAvailable(appContext)) return null
+
+        return try {
+            SpeechRecognizer.createOnDeviceSpeechRecognizer(appContext)
+        } catch (_: UnsupportedOperationException) {
+            null
+        } catch (_: RuntimeException) {
+            null
+        }
+    }
+
+    private fun tryCreateDefaultRecognizer(): SpeechRecognizer? {
+        if (!SpeechRecognizer.isRecognitionAvailable(appContext)) return null
+
+        return try {
+            SpeechRecognizer.createSpeechRecognizer(appContext)
+        } catch (_: RuntimeException) {
+            null
+        }
     }
 
     override fun onReadyForSpeech(params: Bundle?) {
