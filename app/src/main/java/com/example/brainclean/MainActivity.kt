@@ -17,7 +17,6 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.material3.CenterAlignedTopAppBar
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FilterChip
-import androidx.compose.material3.TextButton
 import androidx.compose.material3.NavigationBar
 import androidx.compose.material3.NavigationBarItem
 import androidx.compose.material3.Scaffold
@@ -29,6 +28,7 @@ import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.SnackbarResult
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
@@ -38,12 +38,12 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
-import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.ViewModelProvider
-import androidx.lifecycle.lifecycleScope
-import androidx.lifecycle.repeatOnLifecycle
+import com.example.brainclean.capture.CaptureNotificationManager
 import com.example.brainclean.model.Thought
 import com.example.brainclean.model.ThoughtStatus
 import com.example.brainclean.reminder.ThoughtReminderReceiver
@@ -63,22 +63,6 @@ class MainActivity : ComponentActivity() {
         thoughtViewModel = ViewModelProvider(this)[ThoughtViewModel::class.java]
         ThoughtReminderReceiver.createNotificationChannel(this)
 
-        lifecycleScope.launch {
-            repeatOnLifecycle(Lifecycle.State.STARTED) {
-                thoughtViewModel.events.collect { event ->
-                    when (event) {
-                        ThoughtUiEvent.RequestExactAlarmPermission -> {
-                            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
-                                startActivity(Intent(Settings.ACTION_REQUEST_SCHEDULE_EXACT_ALARM))
-                            }
-                        }
-
-                        ThoughtUiEvent.RequestNotificationPermission -> Unit
-                    }
-                }
-            }
-        }
-
         setContent {
             BrainCleanTheme {
                 BrainCleanApp(thoughtViewModel)
@@ -90,6 +74,7 @@ class MainActivity : ComponentActivity() {
         super.onResume()
         if (::thoughtViewModel.isInitialized) {
             thoughtViewModel.syncScheduledReminders()
+            CaptureNotificationManager.ensureVisible(this)
         }
     }
 }
@@ -97,7 +82,11 @@ class MainActivity : ComponentActivity() {
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun BrainCleanApp(thoughtViewModel: ThoughtViewModel) {
+    val context = LocalContext.current
     var isSearchExpanded by remember { mutableStateOf(false) }
+    var hasNotificationRuntimePermission by remember {
+        mutableStateOf(CaptureNotificationManager.hasRuntimePermission(context))
+    }
     val uiState by thoughtViewModel.uiState.collectAsState()
     val snackbarHostState = remember { SnackbarHostState() }
     val coroutineScope = rememberCoroutineScope()
@@ -107,14 +96,33 @@ fun BrainCleanApp(thoughtViewModel: ThoughtViewModel) {
     val sortOption = uiState.sortOption
     val notificationPermissionLauncher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.RequestPermission()
-    ) { }
+    ) { granted ->
+        hasNotificationRuntimePermission = granted ||
+            CaptureNotificationManager.hasRuntimePermission(context)
+        if (hasNotificationRuntimePermission) {
+            CaptureNotificationManager.ensureVisible(context)
+        }
+    }
 
     LaunchedEffect(thoughtViewModel) {
         thoughtViewModel.events.collect { event ->
-            if (event == ThoughtUiEvent.RequestNotificationPermission &&
-                Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU
-            ) {
-                notificationPermissionLauncher.launch(Manifest.permission.POST_NOTIFICATIONS)
+            when (event) {
+                ThoughtUiEvent.RequestExactAlarmPermission -> {
+                    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+                        context.startActivity(Intent(Settings.ACTION_REQUEST_SCHEDULE_EXACT_ALARM))
+                    }
+                }
+
+                ThoughtUiEvent.RequestNotificationPermission -> {
+                    if (
+                        Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU &&
+                        !CaptureNotificationManager.hasRuntimePermission(context)
+                    ) {
+                        notificationPermissionLauncher.launch(Manifest.permission.POST_NOTIFICATIONS)
+                    } else {
+                        CaptureNotificationManager.ensureVisible(context)
+                    }
+                }
             }
         }
     }
@@ -227,6 +235,19 @@ fun BrainCleanApp(thoughtViewModel: ThoughtViewModel) {
                             }
                             TextButton(onClick = ::clearSelection) {
                                 Text("Cancel")
+                            }
+                        } else if (
+                            Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU &&
+                            !hasNotificationRuntimePermission
+                        ) {
+                            TextButton(
+                                onClick = {
+                                    notificationPermissionLauncher.launch(
+                                        Manifest.permission.POST_NOTIFICATIONS
+                                    )
+                                }
+                            ) {
+                                Text(stringResource(R.string.enable_capture_notification_action))
                             }
                         }
                     }
