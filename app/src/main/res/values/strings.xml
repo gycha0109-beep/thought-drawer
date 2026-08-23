@@ -13,4 +13,5 @@
     <string name="capture_notification_text">생각이 스치면 바로 넣어두세요</string>
     <string name="capture_notification_action">생각 추가</string>
     <string name="capture_notification_input_label">생각을 입력하세요</string>
+    <string name="quick_settings_tile_label">생각 추가</string>
 </resources>
