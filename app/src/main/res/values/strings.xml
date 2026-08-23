@@ -22,4 +22,9 @@
     <string name="stale_reminder_title">아직 Inbox에 남아 있어요</string>
     <string name="notification_settings_action">알림 설정</string>
     <string name="lockscreen_reminder_public_text">생각서랍에 확인할 리마인더가 있습니다</string>
+    <string name="voice_capture_action">음성으로 입력</string>
+    <string name="voice_capture_listening">듣는 중…</string>
+    <string name="voice_capture_unavailable">음성 인식 사용 불가</string>
+    <string name="voice_capture_unavailable_detail">이 기기에서 사용할 수 있는 음성 인식 서비스를 찾지 못했습니다.</string>
+    <string name="voice_capture_retry">음성 입력 다시 시도</string>
 </resources>
