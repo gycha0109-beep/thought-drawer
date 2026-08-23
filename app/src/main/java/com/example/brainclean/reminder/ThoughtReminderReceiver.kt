@@ -3,6 +3,7 @@ package com.example.brainclean.reminder
 import android.content.BroadcastReceiver
 import android.content.Context
 import android.content.Intent
+import com.example.brainclean.capture.CaptureNotificationManager
 import com.example.brainclean.data.BrainCleanDatabase
 import com.example.brainclean.data.ThoughtRepository
 import com.example.brainclean.domain.ThoughtCommandService
@@ -82,6 +83,7 @@ class ThoughtReminderReceiver : BroadcastReceiver() {
 
         fun createNotificationChannel(context: Context) {
             ThoughtReminderNotifier.createNotificationChannel(context)
+            CaptureNotificationManager.ensureVisible(context)
         }
     }
 }
