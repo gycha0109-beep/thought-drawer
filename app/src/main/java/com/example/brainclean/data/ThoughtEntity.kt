@@ -1,5 +1,6 @@
 package com.example.brainclean.data
 
+import androidx.room.ColumnInfo
 import androidx.room.Entity
 import androidx.room.PrimaryKey
 import com.example.brainclean.model.CaptureSource
@@ -16,6 +17,7 @@ data class ThoughtEntity(
     val completedAt: Long? = null,
     val inboxEnteredAt: Long,
     val staleInboxReminderSentAt: Long? = null,
+    @ColumnInfo(defaultValue = "'APP'")
     val captureSource: String = CaptureSource.APP.name
 ) {
     fun toThought(): Thought {
