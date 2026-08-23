@@ -129,13 +129,13 @@ fun BrainCleanApp(thoughtViewModel: ThoughtViewModel) {
         }
 
         return when (sortOption) {
-            ThoughtSortOption.RECENT -> filteredThoughts.sortedByDescending { it.id }
-            ThoughtSortOption.OLDEST -> filteredThoughts.sortedBy { it.id }
+            ThoughtSortOption.RECENT -> filteredThoughts.sortedByDescending { it.createdAt }
+            ThoughtSortOption.OLDEST -> filteredThoughts.sortedBy { it.createdAt }
             ThoughtSortOption.REMINDER -> filteredThoughts.sortedWith(
                 compareBy<Thought>(
                     { it.remindAt == null },
                     { it.remindAt ?: Long.MAX_VALUE },
-                    { -it.id }
+                    { -it.createdAt }
                 )
             )
         }
