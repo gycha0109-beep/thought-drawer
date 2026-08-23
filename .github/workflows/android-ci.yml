@@ -26,5 +26,20 @@ jobs:
           sed -i '/^org.gradle.java.home=/d' gradle.properties
           sed -i 's/^org.gradle.jvmargs=.*/org.gradle.jvmargs=-Xmx2g -XX:MaxMetaspaceSize=512m -Dfile.encoding=UTF-8/' gradle.properties
 
-      - name: Compile and assemble debug
-        run: ./gradlew :app:compileDebugKotlin :app:assembleDebug :app:compileDebugAndroidTestKotlin --no-daemon
+      - name: Compile, test, lint, and assemble debug
+        run: >-
+          ./gradlew
+          :app:compileDebugKotlin
+          :app:testDebugUnitTest
+          :app:lintDebug
+          :app:assembleDebug
+          :app:compileDebugAndroidTestKotlin
+          --no-daemon
+
+      - name: Upload debug APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: thought-drawer-debug
+          path: app/build/outputs/apk/debug/app-debug.apk
+          if-no-files-found: error
+          retention-days: 14
