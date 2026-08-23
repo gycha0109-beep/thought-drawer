@@ -27,4 +27,5 @@
     <string name="voice_capture_unavailable">음성 인식 사용 불가</string>
     <string name="voice_capture_unavailable_detail">이 기기에서 사용할 수 있는 음성 인식 서비스를 찾지 못했습니다.</string>
     <string name="voice_capture_retry">음성 입력 다시 시도</string>
+    <string name="share_thought_chooser_title">이 생각을 어디로 보낼까요?</string>
 </resources>
