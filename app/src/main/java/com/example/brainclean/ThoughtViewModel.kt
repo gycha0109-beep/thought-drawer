@@ -5,18 +5,19 @@ import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.SavedStateHandle
 import androidx.lifecycle.viewModelScope
 import com.example.brainclean.data.BrainCleanDatabase
-import com.example.brainclean.data.ThoughtEntity
+import com.example.brainclean.data.ThoughtRepository
+import com.example.brainclean.domain.CaptureResult
+import com.example.brainclean.domain.ThoughtCommandService
+import com.example.brainclean.model.CaptureSource
 import com.example.brainclean.model.Thought
 import com.example.brainclean.model.ThoughtStatus
 import com.example.brainclean.reminder.ReminderSyncResult
-import com.example.brainclean.reminder.ThoughtReminderScheduler
-import com.example.brainclean.widget.BrainCleanHomeWidget
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharedFlow
 import kotlinx.coroutines.flow.StateFlow
-import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.asSharedFlow
+import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
 
 enum class ThoughtTab {
@@ -52,8 +53,14 @@ class ThoughtViewModel(
     application: Application,
     private val savedStateHandle: SavedStateHandle
 ) : AndroidViewModel(application) {
-    private val thoughtDao = BrainCleanDatabase.getDatabase(application).thoughtDao()
-    private val reminderScheduler = ThoughtReminderScheduler(application)
+    private val repository = ThoughtRepository(
+        BrainCleanDatabase.getDatabase(application).thoughtDao()
+    )
+    private val commandService = ThoughtCommandService(
+        context = application,
+        repository = repository
+    )
+
     private val _uiState = MutableStateFlow(
         ThoughtUiState(
             selectedTab = restoreSelectedTab(),
@@ -62,120 +69,46 @@ class ThoughtViewModel(
         )
     )
     val uiState: StateFlow<ThoughtUiState> = _uiState.asStateFlow()
+
     private val _events = MutableSharedFlow<ThoughtUiEvent>()
     val events: SharedFlow<ThoughtUiEvent> = _events.asSharedFlow()
-
-    private var hasSeededDatabase = false
-    private val seedBaseTime = System.currentTimeMillis()
-
-    private val defaultThoughts = listOf(
-        Thought(
-            id = seedBaseTime - 2_000L,
-            content = "Write down the idea for tomorrow's workout",
-            status = ThoughtStatus.INBOX,
-            remindAt = null,
-            createdAt = seedBaseTime - 2_000L,
-            inboxEnteredAt = seedBaseTime - 2_000L
-        ),
-        Thought(
-            id = seedBaseTime - 1_000L,
-            content = "Break the project into the first small step",
-            status = ThoughtStatus.INBOX,
-            remindAt = null,
-            createdAt = seedBaseTime - 1_000L,
-            inboxEnteredAt = seedBaseTime - 1_000L
-        )
-    )
 
     init {
         observeThoughts()
     }
 
     fun addThought(content: String) {
-        val trimmedContent = content.trim()
-        if (trimmedContent.isBlank()) return
-
         viewModelScope.launch {
-            val createdAt = System.currentTimeMillis()
-            val newThought = Thought(
-                id = createdAt,
-                content = trimmedContent,
-                status = ThoughtStatus.INBOX,
-                remindAt = null,
-                createdAt = createdAt,
-                inboxEnteredAt = createdAt
-            )
-
-            thoughtDao.insertThought(ThoughtEntity.fromThought(newThought))
-            BrainCleanHomeWidget.refreshAll(getApplication())
+            when (
+                val result = commandService.captureThought(
+                    content = content,
+                    source = CaptureSource.APP
+                )
+            ) {
+                CaptureResult.Blank -> Unit
+                is CaptureResult.Success -> emitReminderEvents(result.reminderSyncResult)
+            }
         }
     }
 
     fun updateThoughtStatus(id: Long, status: ThoughtStatus) {
-        val existingThought = uiState.value.thoughts.firstOrNull { it.id == id } ?: return
-
         viewModelScope.launch {
-            val now = System.currentTimeMillis()
-            val updatedThought = if (status == ThoughtStatus.DONE) {
-                existingThought.copy(
-                    status = status,
-                    remindAt = null,
-                    completedAt = now
-                )
-            } else if (status == ThoughtStatus.INBOX && existingThought.status != ThoughtStatus.INBOX) {
-                existingThought.copy(
-                    status = status,
-                    completedAt = null,
-                    inboxEnteredAt = now,
-                    staleInboxReminderSentAt = null
-                )
-            } else {
-                existingThought.copy(
-                    status = status,
-                    completedAt = null
-                )
-            }
-            thoughtDao.updateThought(
-                ThoughtEntity.fromThought(updatedThought)
-            )
-            syncReminder(updatedThought)
-            BrainCleanHomeWidget.refreshAll(getApplication())
+            val result = commandService.updateThoughtStatus(id, status)
+            emitReminderEvents(result)
         }
     }
 
     fun updateThoughtContent(id: Long, content: String) {
-        val trimmedContent = content.trim()
-        if (trimmedContent.isBlank()) return
-
-        val existingThought = uiState.value.thoughts.firstOrNull { it.id == id } ?: return
-
         viewModelScope.launch {
-            val updatedThought = existingThought.copy(
-                content = trimmedContent,
-                inboxEnteredAt = if (existingThought.status == ThoughtStatus.INBOX) {
-                    System.currentTimeMillis()
-                } else {
-                    existingThought.inboxEnteredAt
-                },
-                staleInboxReminderSentAt = if (existingThought.status == ThoughtStatus.INBOX) {
-                    null
-                } else {
-                    existingThought.staleInboxReminderSentAt
-                }
-            )
-            thoughtDao.updateThought(ThoughtEntity.fromThought(updatedThought))
-            syncReminder(updatedThought)
-            BrainCleanHomeWidget.refreshAll(getApplication())
+            val result = commandService.updateThoughtContent(id, content)
+            emitReminderEvents(result)
         }
     }
 
     fun updateThoughtReminder(id: Long, remindAt: Long?) {
-        val existingThought = uiState.value.thoughts.firstOrNull { it.id == id } ?: return
-
         viewModelScope.launch {
-            val updatedThought = existingThought.copy(remindAt = remindAt)
-            thoughtDao.updateThought(ThoughtEntity.fromThought(updatedThought))
-            syncReminder(updatedThought)
+            val result = commandService.updateThoughtReminder(id, remindAt)
+            emitReminderEvents(result)
         }
     }
 
@@ -184,45 +117,27 @@ class ThoughtViewModel(
     }
 
     fun deleteThought(id: Long) {
-        val existingThought = uiState.value.thoughts.firstOrNull { it.id == id } ?: return
-
         viewModelScope.launch {
-            thoughtDao.deleteThought(ThoughtEntity.fromThought(existingThought))
-            reminderScheduler.cancelReminder(existingThought.id)
-            reminderScheduler.cancelStaleInboxReminder(existingThought.id)
-            BrainCleanHomeWidget.refreshAll(getApplication())
+            commandService.deleteThought(id)
         }
     }
 
     fun deleteThoughts(ids: Set<Long>) {
-        if (ids.isEmpty()) return
-
-        val thoughtsToDelete = uiState.value.thoughts.filter { it.id in ids }
-        if (thoughtsToDelete.isEmpty()) return
-
         viewModelScope.launch {
-            thoughtsToDelete.forEach { thought ->
-                thoughtDao.deleteThought(ThoughtEntity.fromThought(thought))
-                reminderScheduler.cancelReminder(thought.id)
-                reminderScheduler.cancelStaleInboxReminder(thought.id)
-            }
-            BrainCleanHomeWidget.refreshAll(getApplication())
+            commandService.deleteThoughts(ids)
         }
     }
 
     fun restoreThought(thought: Thought) {
         viewModelScope.launch {
-            thoughtDao.insertThought(ThoughtEntity.fromThought(thought))
-            syncReminder(thought)
-            BrainCleanHomeWidget.refreshAll(getApplication())
+            val result = commandService.restoreThought(thought)
+            emitReminderEvents(result)
         }
     }
 
     fun syncScheduledReminders() {
         viewModelScope.launch {
-            uiState.value.thoughts.fold(ReminderSyncResult()) { acc, thought ->
-                acc + syncReminder(thought, emitEvents = false)
-            }
+            commandService.syncScheduledReminders()
         }
     }
 
@@ -245,18 +160,8 @@ class ThoughtViewModel(
 
     private fun observeThoughts() {
         viewModelScope.launch {
-            thoughtDao.observeAllThoughts().collect { thoughtEntities ->
-                if (thoughtEntities.isEmpty() && !hasSeededDatabase) {
-                    hasSeededDatabase = true
-                    defaultThoughts.forEach { thought ->
-                        thoughtDao.insertThought(ThoughtEntity.fromThought(thought))
-                    }
-                    BrainCleanHomeWidget.refreshAll(getApplication())
-                } else {
-                    _uiState.value = _uiState.value.copy(
-                        thoughts = thoughtEntities.map { it.toThought() }
-                    )
-                }
+            repository.observeThoughts().collect { thoughts ->
+                _uiState.value = _uiState.value.copy(thoughts = thoughts)
             }
         }
     }
@@ -291,20 +196,13 @@ class ThoughtViewModel(
         return "search_query_${tab.name.lowercase()}"
     }
 
-    private suspend fun syncReminder(
-        thought: Thought,
-        emitEvents: Boolean = true
-    ): ReminderSyncResult {
-        val result = reminderScheduler.syncReminder(thought)
-
-        if (emitEvents && result.needsExactAlarmPermission) {
+    private suspend fun emitReminderEvents(result: ReminderSyncResult) {
+        if (result.needsExactAlarmPermission) {
             _events.emit(ThoughtUiEvent.RequestExactAlarmPermission)
         }
-        if (emitEvents && result.needsNotificationPermission) {
+        if (result.needsNotificationPermission) {
             _events.emit(ThoughtUiEvent.RequestNotificationPermission)
         }
-
-        return result
     }
 
     private companion object {

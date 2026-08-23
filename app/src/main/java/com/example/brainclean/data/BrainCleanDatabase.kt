@@ -1,15 +1,15 @@
 package com.example.brainclean.data
 
 import android.content.Context
-import androidx.room.Room
 import androidx.room.Database
-import androidx.room.migration.Migration
+import androidx.room.Room
 import androidx.room.RoomDatabase
+import androidx.room.migration.Migration
 import androidx.sqlite.db.SupportSQLiteDatabase
 
 @Database(
     entities = [ThoughtEntity::class],
-    version = 4,
+    version = 5,
     exportSchema = false
 )
 abstract class BrainCleanDatabase : RoomDatabase() {
@@ -29,10 +29,11 @@ abstract class BrainCleanDatabase : RoomDatabase() {
                     .addMigrations(MIGRATION_1_2)
                     .addMigrations(MIGRATION_2_3)
                     .addMigrations(MIGRATION_3_4)
+                    .addMigrations(MIGRATION_4_5)
                     .build()
                     .also { database ->
-                    INSTANCE = database
-                }
+                        INSTANCE = database
+                    }
             }
         }
 
@@ -68,6 +69,14 @@ abstract class BrainCleanDatabase : RoomDatabase() {
                         ELSE 0
                     END
                     """.trimIndent()
+                )
+            }
+        }
+
+        private val MIGRATION_4_5 = object : Migration(4, 5) {
+            override fun migrate(database: SupportSQLiteDatabase) {
+                database.execSQL(
+                    "ALTER TABLE thoughts ADD COLUMN captureSource TEXT NOT NULL DEFAULT 'APP'"
                 )
             }
         }

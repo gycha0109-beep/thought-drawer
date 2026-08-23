@@ -1,7 +1,9 @@
 package com.example.brainclean.data
 
+import androidx.room.ColumnInfo
 import androidx.room.Entity
 import androidx.room.PrimaryKey
+import com.example.brainclean.model.CaptureSource
 import com.example.brainclean.model.Thought
 import com.example.brainclean.model.ThoughtStatus
 
@@ -14,7 +16,9 @@ data class ThoughtEntity(
     val createdAt: Long,
     val completedAt: Long? = null,
     val inboxEnteredAt: Long,
-    val staleInboxReminderSentAt: Long? = null
+    val staleInboxReminderSentAt: Long? = null,
+    @ColumnInfo(defaultValue = "'APP'")
+    val captureSource: String = CaptureSource.APP.name
 ) {
     fun toThought(): Thought {
         return Thought(
@@ -25,7 +29,9 @@ data class ThoughtEntity(
             createdAt = createdAt,
             completedAt = completedAt,
             inboxEnteredAt = inboxEnteredAt,
-            staleInboxReminderSentAt = staleInboxReminderSentAt
+            staleInboxReminderSentAt = staleInboxReminderSentAt,
+            captureSource = CaptureSource.entries.firstOrNull { it.name == captureSource }
+                ?: CaptureSource.APP
         )
     }
 
@@ -39,7 +45,8 @@ data class ThoughtEntity(
                 createdAt = thought.createdAt,
                 completedAt = thought.completedAt,
                 inboxEnteredAt = thought.inboxEnteredAt,
-                staleInboxReminderSentAt = thought.staleInboxReminderSentAt
+                staleInboxReminderSentAt = thought.staleInboxReminderSentAt,
+                captureSource = thought.captureSource.name
             )
         }
     }

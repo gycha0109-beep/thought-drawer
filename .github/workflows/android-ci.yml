@@ -1,0 +1,30 @@
+name: Android CI
+
+on:
+  pull_request:
+    branches: [main]
+  push:
+    branches: [main]
+
+jobs:
+  debug-build:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up JDK 17
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "17"
+
+      - name: Prepare Gradle for CI
+        run: |
+          chmod +x gradlew
+          sed -i '/^org.gradle.java.home=/d' gradle.properties
+          sed -i 's/^org.gradle.jvmargs=.*/org.gradle.jvmargs=-Xmx2g -XX:MaxMetaspaceSize=512m -Dfile.encoding=UTF-8/' gradle.properties
+
+      - name: Compile and assemble debug
+        run: ./gradlew :app:compileDebugKotlin :app:assembleDebug :app:compileDebugAndroidTestKotlin --no-daemon
