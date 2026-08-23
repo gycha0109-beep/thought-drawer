@@ -10,6 +10,7 @@ import android.content.Intent
 import android.content.pm.PackageManager
 import android.media.AudioAttributes
 import android.media.RingtoneManager
+import android.net.Uri
 import android.os.Build
 import android.provider.Settings
 import androidx.core.app.NotificationCompat
@@ -102,9 +103,8 @@ class ThoughtReminderNotifier(
                 .putExtra(Settings.EXTRA_APP_PACKAGE, appContext.packageName)
                 .putExtra(Settings.EXTRA_CHANNEL_ID, channelId)
         } else {
-            Intent(Settings.ACTION_APP_NOTIFICATION_SETTINGS)
-                .putExtra("app_package", appContext.packageName)
-                .putExtra("app_uid", appContext.applicationInfo.uid)
+            Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS)
+                .setData(Uri.parse("package:${appContext.packageName}"))
         }
 
         return if (intent.resolveActivity(appContext.packageManager) != null) {
@@ -129,11 +129,14 @@ class ThoughtReminderNotifier(
         }
 
         fun canPostNotifications(context: Context): Boolean {
-            return Build.VERSION.SDK_INT < Build.VERSION_CODES.TIRAMISU ||
+            val runtimePermissionGranted = Build.VERSION.SDK_INT < Build.VERSION_CODES.TIRAMISU ||
                 ContextCompat.checkSelfPermission(
                     context,
                     Manifest.permission.POST_NOTIFICATIONS
                 ) == PackageManager.PERMISSION_GRANTED
+
+            return runtimePermissionGranted &&
+                NotificationManagerCompat.from(context).areNotificationsEnabled()
         }
 
         private fun createNotificationChannels(context: Context) {
