@@ -8,5 +8,6 @@ data class Thought(
     val createdAt: Long,
     val completedAt: Long? = null,
     val inboxEnteredAt: Long,
-    val staleInboxReminderSentAt: Long? = null
+    val staleInboxReminderSentAt: Long? = null,
+    val captureSource: CaptureSource = CaptureSource.APP
 )
