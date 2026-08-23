@@ -24,7 +24,7 @@ class ThoughtReminderRescheduleReceiver : BroadcastReceiver() {
                     context = context.applicationContext,
                     repository = repository
                 )
-                commandService.syncScheduledReminders()
+                commandService.syncExplicitReminders()
             } finally {
                 pendingResult.finish()
             }
