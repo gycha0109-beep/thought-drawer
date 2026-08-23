@@ -156,6 +156,46 @@ class ThoughtCommandService(
         return result
     }
 
+    suspend fun consumeExplicitReminder(
+        id: Long,
+        expectedRemindAt: Long
+    ): Thought? {
+        val currentThought = repository.getThought(id) ?: return null
+        if (
+            currentThought.status == ThoughtStatus.DONE ||
+            currentThought.remindAt != expectedRemindAt
+        ) {
+            return null
+        }
+
+        val updatedThought = currentThought.copy(remindAt = null)
+        repository.update(updatedThought)
+        reminderScheduler.syncReminder(updatedThought)
+        BrainCleanHomeWidget.refreshAll(context)
+        return updatedThought
+    }
+
+    suspend fun consumeStaleInboxReminder(
+        id: Long,
+        expectedInboxEnteredAt: Long
+    ): Thought? {
+        val currentThought = repository.getThought(id) ?: return null
+        if (
+            currentThought.status != ThoughtStatus.INBOX ||
+            currentThought.inboxEnteredAt != expectedInboxEnteredAt ||
+            currentThought.staleInboxReminderSentAt != null
+        ) {
+            return null
+        }
+
+        val updatedThought = currentThought.copy(
+            staleInboxReminderSentAt = System.currentTimeMillis()
+        )
+        repository.update(updatedThought)
+        BrainCleanHomeWidget.refreshAll(context)
+        return updatedThought
+    }
+
     suspend fun syncScheduledReminders(): ReminderSyncResult {
         return repository.getAllThoughts().fold(ReminderSyncResult()) { acc, thought ->
             acc + reminderScheduler.syncReminder(thought)
