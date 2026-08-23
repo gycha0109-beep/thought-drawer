@@ -56,7 +56,7 @@ fun DoneScreen(
                     onEditThought = { onEditThought(thought.id, it) },
                     onSetReminder = {},
                     onClearReminder = {},
-                    enableDoneSwipe = false,
+                    enableDoneAction = false,
                     enableReminder = false
                 )
             }
