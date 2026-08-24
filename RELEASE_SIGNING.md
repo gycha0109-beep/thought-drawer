@@ -59,7 +59,7 @@ For team-owned apps, use your company or team identity consistently.
 
 ## Create `keystore.properties`
 
-Copy [keystore.properties.example](/C:/Users/hun/AndroidStudioProjects/Brainclean/keystore.properties.example) to `keystore.properties` and fill it in:
+Copy [keystore.properties.example](keystore.properties.example) to `keystore.properties` and fill it in:
 
 ```properties
 release.storeFile=release-keystore/brainclean-upload.jks
@@ -74,7 +74,7 @@ Instead of `keystore.properties`, you can set:
 
 ```powershell
 $env:BRAINCLEAN_RELEASE_STORE_FILE="release-keystore/brainclean-upload.jks"
-$env:BRAINCLEAN_RELEASE_STORE_PASSWORD="YOUR_KEYSTORE_PASSWORD"
+$env:BRAINCLEAN_RELEASE_STORE_PASSWORD="YOUR_STORE_PASSWORD"
 $env:BRAINCLEAN_RELEASE_KEY_ALIAS="upload"
 $env:BRAINCLEAN_RELEASE_KEY_PASSWORD="YOUR_KEY_PASSWORD"
 ```
