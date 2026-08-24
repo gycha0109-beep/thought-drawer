@@ -1,0 +1,19 @@
+schema_version: "1.0"
+graph:
+  max_file_size_bytes: 1000000
+components:
+  - id: android-app
+    name: Thought Drawer Android App
+    paths: ["app/**"]
+  - id: build-system
+    name: Gradle Build System
+    paths: ["gradle/**", "*.gradle.kts", "gradle.properties", "gradlew", "gradlew.bat"]
+  - id: release-signing
+    name: Release Signing Documentation
+    paths: ["RELEASE_SIGNING.md"]
+  - id: pie-config
+    name: PIE Project Configuration
+    paths: [".review/**"]
+  - id: github-workflows
+    name: GitHub Workflows
+    paths: [".github/workflows/**"]

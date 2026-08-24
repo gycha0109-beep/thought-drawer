@@ -59,7 +59,7 @@ For team-owned apps, use your company or team identity consistently.
 
 ## Create `keystore.properties`
 
-Copy [keystore.properties.example](/C:/Users/hun/AndroidStudioProjects/Brainclean/keystore.properties.example) to `keystore.properties` and fill it in:
+Copy [keystore.properties.example](keystore.properties.example) to `keystore.properties` and fill it in:
 
 ```properties
 release.storeFile=release-keystore/brainclean-upload.jks
