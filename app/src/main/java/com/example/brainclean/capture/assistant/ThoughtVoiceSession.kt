@@ -57,7 +57,7 @@ class ThoughtVoiceSession(
             gravity = Gravity.CENTER_HORIZONTAL
             setPadding(dp(24), dp(20), dp(24), dp(20))
             background = GradientDrawable().apply {
-                color = Color.WHITE
+                setColor(Color.WHITE)
                 cornerRadius = dp(24).toFloat()
             }
             layoutParams = ViewGroup.LayoutParams(
