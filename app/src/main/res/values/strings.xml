@@ -29,4 +29,21 @@
     <string name="voice_capture_unavailable_detail">이 기기에서 사용할 수 있는 음성 인식 서비스를 찾지 못했습니다.</string>
     <string name="voice_capture_retry">음성 입력 다시 시도</string>
     <string name="share_thought_chooser_title">이 생각을 어디로 보낼까요?</string>
+
+    <string name="assistant_capture_role_label">생각서랍 음성 캡처</string>
+    <string name="assistant_capture_setup_title">전원 버튼으로 바로 말하기</string>
+    <string name="assistant_capture_setup_detail">원하면 전원 버튼을 길게 눌러 생각을 바로 말하고 자동 저장할 수 있습니다.</string>
+    <string name="assistant_capture_setup_enabled">사용 중</string>
+    <string name="assistant_capture_setup_enabled_detail">전원 버튼을 길게 누르면 생각서랍 음성 캡처가 실행됩니다.</string>
+    <string name="assistant_capture_setup_action">사용해보기</string>
+    <string name="assistant_capture_confirm_title">전원 버튼을 생각 캡처에 사용할까요?</string>
+    <string name="assistant_capture_confirm_detail">현재 Gemini/Bixby 같은 기본 디지털 어시스턴트 대신 생각서랍이 실행됩니다. 시스템 설정에서 언제든 다시 바꿀 수 있습니다.</string>
+    <string name="assistant_capture_confirm_action">계속</string>
+    <string name="assistant_capture_listening">듣는 중…</string>
+    <string name="assistant_capture_auto_save_hint">말이 끝나면 Inbox에 자동 저장됩니다.</string>
+    <string name="assistant_capture_saving">저장 중…</string>
+    <string name="assistant_capture_saved">생각 저장됨</string>
+    <string name="assistant_capture_no_result">저장할 내용을 찾지 못했습니다.</string>
+    <string name="assistant_capture_retry">다시 듣기</string>
+    <string name="assistant_capture_cancel">취소</string>
 </resources>
