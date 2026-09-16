@@ -37,17 +37,21 @@ fun AssistantCaptureSetupCard() {
     var isEnabled by remember { mutableStateOf(manager.isEnabled()) }
     var showConfirmation by remember { mutableStateOf(false) }
 
-    val roleLauncher = rememberLauncherForActivityResult(
+    val settingsLauncher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.StartActivityForResult()
     ) {
         isEnabled = manager.isEnabled()
+    }
+
+    fun openAssistantSettings() {
+        manager.createAssistantSettingsIntent()?.let(settingsLauncher::launch)
     }
 
     val microphonePermissionLauncher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.RequestPermission()
     ) { granted ->
         if (granted) {
-            manager.createRoleRequestIntent()?.let(roleLauncher::launch)
+            openAssistantSettings()
         }
     }
 
@@ -104,7 +108,7 @@ fun AssistantCaptureSetupCard() {
                                 Manifest.permission.RECORD_AUDIO
                             ) == PackageManager.PERMISSION_GRANTED
                         ) {
-                            manager.createRoleRequestIntent()?.let(roleLauncher::launch)
+                            openAssistantSettings()
                         } else {
                             microphonePermissionLauncher.launch(Manifest.permission.RECORD_AUDIO)
                         }
