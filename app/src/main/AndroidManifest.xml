@@ -28,7 +28,12 @@
             android:excludeFromRecents="true"
             android:exported="true"
             android:label="@string/assistant_capture_role_label"
-            android:theme="@style/Theme.BrainClean" />
+            android:theme="@style/Theme.BrainClean">
+            <intent-filter>
+                <action android:name="android.intent.action.ASSIST" />
+                <category android:name="android.intent.category.DEFAULT" />
+            </intent-filter>
+        </activity>
 
         <activity
             android:name=".QuickAddActivity"
