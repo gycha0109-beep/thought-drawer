@@ -5,5 +5,6 @@ enum class CaptureSource {
     WIDGET,
     NOTIFICATION,
     QUICK_SETTINGS,
-    VOICE
+    VOICE,
+    ASSISTANT
 }

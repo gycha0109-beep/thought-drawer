@@ -22,6 +22,7 @@ import androidx.compose.ui.platform.LocalSoftwareKeyboardController
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.unit.dp
 import com.example.brainclean.model.Thought
+import com.example.brainclean.ui.component.AssistantCaptureSetupCard
 import com.example.brainclean.ui.component.ThoughtItem
 import com.example.brainclean.ui.component.formatThoughtTimestamp
 
@@ -80,8 +81,12 @@ fun InboxScreen(
                 .padding(top = 16.dp)
                 .testTag("inbox_list"),
             contentPadding = PaddingValues(bottom = 24.dp),
-            verticalArrangement = Arrangement.spacedBy(4.dp)
+            verticalArrangement = Arrangement.spacedBy(8.dp)
         ) {
+            item(key = "assistant_capture_setup") {
+                AssistantCaptureSetupCard()
+            }
+
             items(thoughts, key = { it.id }) { thought ->
                 ThoughtItem(
                     thought = thought,
