@@ -34,24 +34,21 @@ fun AssistantCaptureSetupCard() {
 
     if (!manager.isSupported()) return
 
-    var isEnabled by remember { mutableStateOf(manager.isEnabled()) }
     var showConfirmation by remember { mutableStateOf(false) }
 
     val settingsLauncher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.StartActivityForResult()
-    ) {
-        isEnabled = manager.isEnabled()
-    }
+    ) { }
 
-    fun openAssistantSettings() {
-        manager.createAssistantSettingsIntent()?.let(settingsLauncher::launch)
+    fun openSideButtonSettings() {
+        manager.createSideButtonSettingsIntent()?.let(settingsLauncher::launch)
     }
 
     val microphonePermissionLauncher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.RequestPermission()
     ) { granted ->
         if (granted) {
-            openAssistantSettings()
+            openSideButtonSettings()
         }
     }
 
@@ -67,33 +64,17 @@ fun AssistantCaptureSetupCard() {
                 style = MaterialTheme.typography.titleMedium
             )
             Text(
-                text = if (isEnabled) {
-                    stringResource(R.string.assistant_capture_setup_enabled_detail)
-                } else {
-                    stringResource(R.string.assistant_capture_setup_detail)
-                },
+                text = stringResource(R.string.assistant_capture_setup_detail),
                 modifier = Modifier.padding(top = 6.dp),
                 style = MaterialTheme.typography.bodyMedium
             )
             Button(
-                onClick = {
-                    if (isEnabled) {
-                        openAssistantSettings()
-                    } else {
-                        showConfirmation = true
-                    }
-                },
+                onClick = { showConfirmation = true },
                 modifier = Modifier
                     .fillMaxWidth()
                     .padding(top = 12.dp)
             ) {
-                Text(
-                    if (isEnabled) {
-                        stringResource(R.string.assistant_capture_setup_manage)
-                    } else {
-                        stringResource(R.string.assistant_capture_setup_action)
-                    }
-                )
+                Text(stringResource(R.string.assistant_capture_setup_action))
             }
         }
     }
@@ -113,7 +94,7 @@ fun AssistantCaptureSetupCard() {
                                 Manifest.permission.RECORD_AUDIO
                             ) == PackageManager.PERMISSION_GRANTED
                         ) {
-                            openAssistantSettings()
+                            openSideButtonSettings()
                         } else {
                             microphonePermissionLauncher.launch(Manifest.permission.RECORD_AUDIO)
                         }
