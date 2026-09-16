@@ -15,7 +15,6 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -25,16 +24,12 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import androidx.core.content.ContextCompat
-import androidx.lifecycle.Lifecycle
-import androidx.lifecycle.LifecycleEventObserver
-import androidx.lifecycle.compose.LocalLifecycleOwner
 import com.example.brainclean.R
 import com.example.brainclean.capture.assistant.AssistantCaptureManager
 
 @Composable
 fun AssistantCaptureSetupCard() {
     val context = LocalContext.current
-    val lifecycleOwner = LocalLifecycleOwner.current
     val manager = remember(context) { AssistantCaptureManager(context) }
 
     if (!manager.isSupported()) return
@@ -42,24 +37,18 @@ fun AssistantCaptureSetupCard() {
     var isEnabled by remember { mutableStateOf(manager.isEnabled()) }
     var showConfirmation by remember { mutableStateOf(false) }
 
-    fun launchRoleRequest() {
-        manager.createRoleRequestIntent()?.let(context::startActivity)
+    val roleLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.StartActivityForResult()
+    ) {
+        isEnabled = manager.isEnabled()
     }
 
     val microphonePermissionLauncher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.RequestPermission()
     ) { granted ->
-        if (granted) launchRoleRequest()
-    }
-
-    DisposableEffect(lifecycleOwner, manager) {
-        val observer = LifecycleEventObserver { _, event ->
-            if (event == Lifecycle.Event.ON_RESUME) {
-                isEnabled = manager.isEnabled()
-            }
+        if (granted) {
+            manager.createRoleRequestIntent()?.let(roleLauncher::launch)
         }
-        lifecycleOwner.lifecycle.addObserver(observer)
-        onDispose { lifecycleOwner.lifecycle.removeObserver(observer) }
     }
 
     Card(
@@ -115,7 +104,7 @@ fun AssistantCaptureSetupCard() {
                                 Manifest.permission.RECORD_AUDIO
                             ) == PackageManager.PERMISSION_GRANTED
                         ) {
-                            launchRoleRequest()
+                            manager.createRoleRequestIntent()?.let(roleLauncher::launch)
                         } else {
                             microphonePermissionLauncher.launch(Manifest.permission.RECORD_AUDIO)
                         }
