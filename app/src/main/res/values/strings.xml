@@ -31,14 +31,16 @@
     <string name="share_thought_chooser_title">이 생각을 어디로 보낼까요?</string>
 
     <string name="assistant_capture_role_label">생각서랍 음성 캡처</string>
-    <string name="assistant_capture_setup_title">전원 버튼으로 바로 말하기</string>
-    <string name="assistant_capture_setup_detail">원하면 전원 버튼을 길게 눌러 생각을 바로 말하고 자동 저장할 수 있습니다.</string>
-    <string name="assistant_capture_setup_enabled">사용 중</string>
-    <string name="assistant_capture_setup_enabled_detail">전원 버튼을 길게 누르면 생각서랍 음성 캡처가 실행됩니다.</string>
-    <string name="assistant_capture_setup_action">사용해보기</string>
-    <string name="assistant_capture_setup_manage">어시스턴트 설정</string>
-    <string name="assistant_capture_confirm_title">전원 버튼을 생각 캡처에 사용할까요?</string>
-    <string name="assistant_capture_confirm_detail">현재 Gemini/Bixby 같은 기본 디지털 어시스턴트 대신 생각서랍을 선택하는 시스템 설정으로 이동합니다. 디지털 어시스턴트 앱에서 생각서랍을 직접 선택해 주세요. 언제든 다시 바꿀 수 있습니다.</string>
+    <string name="assistant_capture_shortcut_short">음성 캡처</string>
+    <string name="assistant_capture_shortcut_long">생각 바로 말하기</string>
+    <string name="assistant_capture_setup_title">사이드 버튼으로 바로 말하기</string>
+    <string name="assistant_capture_setup_detail">Galaxy 설정에서 사이드 버튼의 길게 누르기 또는 두 번 누르기를 생각서랍의 ‘음성 캡처’에 지정하면, 물리 버튼에서 바로 듣고 Inbox에 자동 저장합니다.</string>
+    <string name="assistant_capture_setup_enabled">설정됨</string>
+    <string name="assistant_capture_setup_enabled_detail">사이드 버튼 설정에서 생각서랍 → 음성 캡처가 지정되어 있으면 물리 버튼으로 바로 실행됩니다.</string>
+    <string name="assistant_capture_setup_action">사이드 버튼 설정 열기</string>
+    <string name="assistant_capture_setup_manage">사이드 버튼 설정 열기</string>
+    <string name="assistant_capture_confirm_title">물리 사이드 버튼에 연결합니다</string>
+    <string name="assistant_capture_confirm_detail">설정 → 유용한 기능 → 사이드 버튼에서 ‘길게 누르기’ 또는 ‘두 번 누르기’를 선택한 뒤 생각서랍 → 음성 캡처를 지정해 주세요. 짧게 한 번 누르기는 시스템의 화면 켜기/끄기 기능이라 앱이 가져올 수 없습니다.</string>
     <string name="assistant_capture_confirm_action">설정 열기</string>
     <string name="assistant_capture_listening">듣는 중…</string>
     <string name="assistant_capture_auto_save_hint">말이 끝나면 Inbox에 자동 저장됩니다.</string>
