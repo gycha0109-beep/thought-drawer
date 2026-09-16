@@ -76,15 +76,20 @@ fun AssistantCaptureSetupCard() {
                 style = MaterialTheme.typography.bodyMedium
             )
             Button(
-                onClick = { showConfirmation = true },
-                enabled = !isEnabled,
+                onClick = {
+                    if (isEnabled) {
+                        openAssistantSettings()
+                    } else {
+                        showConfirmation = true
+                    }
+                },
                 modifier = Modifier
                     .fillMaxWidth()
                     .padding(top = 12.dp)
             ) {
                 Text(
                     if (isEnabled) {
-                        stringResource(R.string.assistant_capture_setup_enabled)
+                        stringResource(R.string.assistant_capture_setup_manage)
                     } else {
                         stringResource(R.string.assistant_capture_setup_action)
                     }
