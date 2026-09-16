@@ -20,17 +20,28 @@ object AssistantCaptureFeedback {
 
     @Suppress("DEPRECATION")
     private fun vibrate(context: Context) {
-        val effect = VibrationEffect.createOneShot(
-            35L,
-            VibrationEffect.DEFAULT_AMPLITUDE
-        )
+        when {
+            Build.VERSION.SDK_INT >= Build.VERSION_CODES.S -> {
+                val effect = VibrationEffect.createOneShot(
+                    35L,
+                    VibrationEffect.DEFAULT_AMPLITUDE
+                )
+                context.getSystemService(VibratorManager::class.java)
+                    ?.defaultVibrator
+                    ?.vibrate(effect)
+            }
 
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
-            context.getSystemService(VibratorManager::class.java)
-                ?.defaultVibrator
-                ?.vibrate(effect)
-        } else {
-            context.getSystemService(Vibrator::class.java)?.vibrate(effect)
+            Build.VERSION.SDK_INT >= Build.VERSION_CODES.O -> {
+                val effect = VibrationEffect.createOneShot(
+                    35L,
+                    VibrationEffect.DEFAULT_AMPLITUDE
+                )
+                context.getSystemService(Vibrator::class.java)?.vibrate(effect)
+            }
+
+            else -> {
+                context.getSystemService(Vibrator::class.java)?.vibrate(35L)
+            }
         }
     }
 }
